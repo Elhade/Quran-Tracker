@@ -10,7 +10,7 @@ import { JUZS, HIZBS, SURAHS, getHizbsForSurah } from '@/data/quran/quran-struct
 import { Check, ChevronDown, Search, X, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-const CYCLE_PRESETS = [3, 7, 10, 21, 30];
+const CYCLE_PRESETS = [3, 5, 7, 15, 30];
 
 type ConfigView = 'juz' | 'sourate';
 
@@ -33,6 +33,7 @@ export default function ConfigPage() {
   const [customCycle, setCustomCycle] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const [selectedJuzIds, setSelectedJuzIds] = useState<Set<string>>(new Set());
+  const [selectedSurahIds, setSelectedSurahIds] = useState<Set<string>>(new Set());
   const [expandedJuz, setExpandedJuz] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [saved, setSaved] = useState(false);
@@ -47,7 +48,15 @@ export default function ConfigPage() {
   // Sync selections from store — always reset (even to empty) on mode switch
   useEffect(() => {
     const modeSections = sections.filter(s => s.modeKey === activeMode && s.isSelected);
-    setSelectedJuzIds(new Set(modeSections.map(s => s.sectionId)));
+    const hizbSet = new Set(modeSections.map(s => s.sectionId));
+    setSelectedJuzIds(hizbSet);
+    // Read surah selections from localStorage (explicit, not derived from hizbs)
+    try {
+      const saved = localStorage.getItem(`qt:surah-selections-${activeMode}`);
+      setSelectedSurahIds(saved ? new Set(JSON.parse(saved)) : new Set());
+    } catch {
+      setSelectedSurahIds(new Set());
+    }
   }, [sections, activeMode]);
 
   const effectiveCycle = useCustom ? (parseInt(customCycle) || storedCycleDays) : selectedCycle;
@@ -83,16 +92,22 @@ export default function ConfigPage() {
   };
 
   // ── Sourate toggle logic ─────────────────────────────────────────────────
-  // A surah is "selected" when ALL its covering hizbs are selected
-  // A surah is "partial" when SOME (but not all) covering hizbs are selected
+  // selectedSurahIds is the source of truth for "selected" in sourate view.
+  // "partial" is still derived from hizb coverage so juz-mode selections are visible.
   const getSurahState = (surahId: string): 'selected' | 'partial' | 'none' => {
+    if (selectedSurahIds.has(surahId)) return 'selected';
     const surah = SURAHS.find(s => s.id === surahId);
     if (!surah) return 'none';
     const hizbs = getHizbsForSurah(surah);
     if (hizbs.length === 0) return 'none';
-    const selectedCount = hizbs.filter(h => selectedJuzIds.has(h.id)).length;
-    if (selectedCount === hizbs.length) return 'selected';
-    if (selectedCount > 0) return 'partial';
+    // Hizbs that are in selectedJuzIds solely because of other selected surahs don't count as partial
+    const surahDerivedHizbIds = new Set<string>();
+    selectedSurahIds.forEach(sid => {
+      const s = SURAHS.find(s => s.id === sid);
+      if (s) getHizbsForSurah(s).forEach(h => surahDerivedHizbIds.add(h.id));
+    });
+    const hasJuzViewHizb = hizbs.some(h => selectedJuzIds.has(h.id) && !surahDerivedHizbIds.has(h.id));
+    if (hasJuzViewHizb) return 'partial';
     return 'none';
   };
 
@@ -100,35 +115,44 @@ export default function ConfigPage() {
     const surah = SURAHS.find(s => s.id === surahId);
     if (!surah) return;
     const hizbs = getHizbsForSurah(surah);
-    const allSelected = hizbs.every(h => selectedJuzIds.has(h.id));
-    const next = new Set(selectedJuzIds);
-    if (allSelected) {
+    const isSelected = selectedSurahIds.has(surahId);
+    const nextSurahIds = new Set(selectedSurahIds);
+    const nextHizbIds = new Set(selectedJuzIds);
+
+    if (isSelected) {
+      nextSurahIds.delete(surahId);
       hizbs.forEach(h => {
-        next.delete(h.id);
-        // Remove parent juz if it was selected
-        next.delete(`juz-${h.juzNumber}`);
+        // Only remove hizb if no other explicitly-selected surah still needs it
+        const stillNeeded = SURAHS.some(s =>
+          s.id !== surahId &&
+          nextSurahIds.has(s.id) &&
+          getHizbsForSurah(s).some(sh => sh.id === h.id)
+        );
+        if (!stillNeeded) {
+          nextHizbIds.delete(h.id);
+          nextHizbIds.delete(`juz-${h.juzNumber}`);
+        }
       });
     } else {
+      nextSurahIds.add(surahId);
       hizbs.forEach(h => {
-        next.add(h.id);
-        // Auto-select parent juz if all its hizbs are now selected
+        nextHizbIds.add(h.id);
         const juz = JUZS.find(j => j.number === h.juzNumber);
-        if (juz && juz.childrenIds.every((hId: string) => next.has(hId))) {
-          next.add(juz.id);
+        if (juz && juz.childrenIds.every((hId: string) => nextHizbIds.has(hId))) {
+          nextHizbIds.add(juz.id);
         }
       });
     }
-    setSelectedJuzIds(next);
+
+    setSelectedSurahIds(nextSurahIds);
+    setSelectedJuzIds(nextHizbIds);
   };
 
   // ── Summary counts ───────────────────────────────────────────────────────
   const selectedIdsArray = Array.from(selectedJuzIds);
   const selectedJuzCount = selectedIdsArray.filter(id => id.startsWith('juz-')).length;
   const selectedHizbCount = selectedIdsArray.filter(id => id.startsWith('hizb-')).length;
-  const selectedSurahCount = useMemo(
-    () => SURAHS.filter(s => getSurahState(s.id) === 'selected').length,
-    [selectedJuzIds]
-  );
+  const selectedSurahCount = selectedSurahIds.size;
   const selectedPageCount = useMemo(
     () => HIZBS
       .filter(h => selectedJuzIds.has(h.id))
@@ -189,6 +213,7 @@ export default function ConfigPage() {
       else if (id.startsWith('hizb-')) sectionIds.push({ id, type: 'hizb' });
     });
     selectSections(LOCAL_USER_ID, activeMode, sectionIds);
+    localStorage.setItem(`qt:surah-selections-${activeMode}`, JSON.stringify(Array.from(selectedSurahIds)));
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -303,7 +328,11 @@ export default function ConfigPage() {
             <h2 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide">Sections à suivre</h2>
             {selectedJuzIds.size > 0 && (
               <button
-                onClick={() => setSelectedJuzIds(new Set())}
+                onClick={() => {
+                  setSelectedJuzIds(new Set());
+                  setSelectedSurahIds(new Set());
+                  localStorage.removeItem(`qt:surah-selections-${activeMode}`);
+                }}
                 className="text-[12px] text-[#9c9890] flex items-center gap-1"
               >
                 <X size={11} /> Tout effacer
@@ -459,14 +488,10 @@ export default function ConfigPage() {
                       {surah.number}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold text-[#1a1714]">{surah.name}</span>
-                        <span className="text-[12px] text-[#9c9890]">·</span>
-                        <span className="text-[12px] text-[#9c9890]">{surah.verseCount} v.</span>
-                      </div>
-                      <span className="text-[11px] text-[#c5c0ba]">{surah.pageEnd - surah.pageStart + 1} p.</span>
+                      <span className="text-[13px] font-semibold text-[#1a1714] block leading-tight">{surah.name}</span>
+                      <span className="text-[11px] text-[#9c9890] mt-0.5 block">{surah.verseCount} ayats · {surah.pageEnd - surah.pageStart + 1} pages</span>
                     </div>
-                    <span className="text-[15px] text-[#3a3632] flex-shrink-0" style={{ fontFamily: 'var(--font-amiri)' }}>
+                    <span className="text-[17px] text-[#3a3632] flex-shrink-0" style={{ fontFamily: 'var(--font-amiri)' }}>
                       {surah.arabicName}
                     </span>
                   </button>

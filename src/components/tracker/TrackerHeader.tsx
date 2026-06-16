@@ -1,37 +1,53 @@
 'use client';
 import { RotateCcw, Settings } from 'lucide-react';
 import Link from 'next/link';
-import type { CycleStats } from '@/types/tracker';
 
 interface TrackerHeaderProps {
-  modeLabel: string;
-  modeColor: string;
   headerBg: string;
-  todayCount: number;
-  stats: CycleStats | null;
   cycleDays: number;
   cycleStartDate: string | null;
   onReset: () => void;
+  daysRemaining: number;
+  daysElapsed: number;
+  targetPerDay: number;
+  cycleDone: number;
+  cycleTotal: number;
+  todayDone: number;
+  unit: string;
 }
 
 export default function TrackerHeader({
-  modeLabel, modeColor, headerBg, todayCount, stats, cycleDays, cycleStartDate, onReset,
+  headerBg, cycleDays, cycleStartDate, onReset,
+  daysRemaining, daysElapsed, targetPerDay,
+  cycleDone, cycleTotal, todayDone, unit,
 }: TrackerHeaderProps) {
-  const completed = stats?.completedSections ?? 0;
-  const total = stats?.totalSections ?? 0;
-  const daysRemaining = stats?.daysRemaining ?? cycleDays;
-  const targetPerDay = total > 0 ? (total / cycleDays).toFixed(1) : '0';
-  const progressPct = stats?.progressPercent ?? 0;
-  const isOverdue = stats?.isOverdue ?? false;
-  const adjustedTarget = stats?.adjustedTargetToday ?? Math.ceil(stats?.targetPerDay ?? 0);
+  const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1);
+
+  const cyclePercent = cycleTotal > 0 ? Math.round((cycleDone / cycleTotal) * 100) : 0;
+
+  // KPI 3 — aujourd'hui + statut rythme
+  const todayPct   = targetPerDay > 0 ? Math.min(100, Math.round((todayDone / targetPerDay) * 100)) : 0;
+  const todayColor = todayDone >= targetPerDay && targetPerDay > 0 ? '#4ade80' : 'white';
+
+  const hasElapsed  = daysElapsed > 0;
+  const paceRef     = hasElapsed ? cycleDone : todayDone;
+  const paceExp     = hasElapsed ? Math.round(targetPerDay * daysElapsed) : Math.round(targetPerDay);
+  const paceDelta   = paceRef - paceExp;
+  const paceLabel   = paceDelta > 0 ? 'en avance' : paceDelta < 0 ? 'en retard' : 'à jour';
+  const paceColor   = paceDelta > 0 ? '#4ade80' : paceDelta < 0 ? '#f87171' : 'rgba(255,255,255,0.55)';
+  const catchUp     = hasElapsed && paceDelta < 0 ? Math.abs(paceDelta) : 0;
 
   const startLabel = cycleStartDate
     ? `Démarré le ${new Date(cycleStartDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`
     : `Cycle de ${cycleDays} jours`;
 
+  const block = { background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.18)' };
+  const sub   = { color: 'rgba(255,255,255,0.6)' };
+  const muted = { color: 'rgba(255,255,255,0.4)' };
+
   return (
     <div style={{ background: headerBg }} className="px-5 pt-5 pb-4">
-      {/* Title row */}
+      {/* Title */}
       <div className="flex items-start justify-between mb-4">
         <div>
           <h1 className="text-[20px] font-bold text-white tracking-tight leading-tight">
@@ -50,53 +66,84 @@ export default function TrackerHeader({
         </Link>
       </div>
 
-      {total > 0 && (
+      {cycleTotal > 0 && (
         <>
-          {/* Stats blocks */}
-          <div className="grid grid-cols-2 gap-2.5 mb-3">
-            <div
-              className="rounded-[14px] p-3.5 flex flex-col gap-1.5"
-              style={{ background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.18)' }}
-            >
-              <div className="text-[34px] font-bold text-white leading-none tracking-tight">
-                {daysRemaining}
+          <div className="grid grid-cols-2 gap-2 mb-2.5">
+
+            {/* KPI 1 — Jours restants */}
+            <div className="rounded-[13px] p-3 flex flex-col gap-0.5" style={block}>
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="text-[28px] font-bold text-white">{daysRemaining}</span>
+                <span className="text-[11px] font-semibold" style={sub}>/ {cycleDays}j</span>
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wide leading-tight" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Jours<br />restants
-              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wide mt-1" style={sub}>
+                Jours restants
+              </span>
             </div>
-            <div
-              className="rounded-[14px] p-3.5 flex flex-col gap-1.5"
-              style={{ background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.18)' }}
-            >
-              <div className="text-[34px] font-bold text-white leading-none tracking-tight">
-                {isOverdue ? adjustedTarget : targetPerDay}
+
+            {/* KPI 2 — Objectif par jour */}
+            <div className="rounded-[13px] p-3 flex flex-col gap-0.5" style={block}>
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="text-[28px] font-bold text-white">{fmt(targetPerDay)}</span>
+                <span className="text-[11px] font-semibold" style={sub}>{unit}</span>
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wide leading-tight" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                {isOverdue ? 'Objectif\naujourd\'hui' : 'Section/jour\nobjectif'}
-              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wide mt-1" style={sub}>
+                Par jour
+              </span>
             </div>
+
+            {/* KPI 3 — Aujourd'hui + statut rythme */}
+            <div className="col-span-2 rounded-[13px] p-3 flex flex-col gap-0.5" style={block}>
+              <div className="flex items-baseline justify-between leading-none">
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-[28px] font-bold" style={{ color: todayColor }}>{fmt(todayDone)}</span>
+                  <span className="text-[12px] font-semibold" style={muted}>
+                    {' '}/ {fmt(targetPerDay)} {unit}
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: paceColor }}>
+                  {paceLabel}
+                </span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wide mt-0.5" style={sub}>
+                Aujourd'hui
+              </span>
+              <div className="h-[3px] rounded-full mt-1.5" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                <div className="h-full rounded-full" style={{ width: `${todayPct}%`, background: todayColor }} />
+              </div>
+              {catchUp > 0 && (
+                <span className="text-[10px] font-semibold mt-1" style={{ color: '#f87171' }}>
+                  retard : {fmt(targetPerDay + catchUp)} {unit} (+{fmt(catchUp)} à rattraper)
+                </span>
+              )}
+            </div>
+
           </div>
 
-          {/* Progress section */}
-          <div className="rounded-[14px] px-3.5 pt-3 pb-2.5" style={{ background: 'rgba(0,0,0,0.12)' }}>
+          {/* Barre + reset */}
+          <div className="rounded-[13px] px-3.5 pt-3 pb-2.5" style={{ background: 'rgba(0,0,0,0.12)' }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                Avancement du cycle
-              </span>
-              <span className="text-[12px] font-bold text-white">
-                {completed} / {total} · {progressPct}%
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Avancement du cycle
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: paceColor }}>
+                  · {paceLabel}
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-white">
+                {cycleDone} / {cycleTotal} {unit} · {cyclePercent}%
               </span>
             </div>
-            <div className="h-[7px] rounded-full mb-3" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <div className="h-[6px] rounded-full mb-3" style={{ background: 'rgba(255,255,255,0.2)' }}>
               <div
                 className="h-full rounded-full bg-white transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
+                style={{ width: `${cyclePercent}%` }}
               />
             </div>
             <button
               onClick={onReset}
-              className="w-full py-2 rounded-[9px] text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all"
+              className="w-full py-2 rounded-[9px] text-[12px] font-bold flex items-center justify-center gap-1.5"
               style={{ border: '1.5px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)' }}
             >
               <RotateCcw size={13} />

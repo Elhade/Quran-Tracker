@@ -13,6 +13,7 @@ interface JuzCardProps {
   hizbStatuses: Map<string, SectionWithStatus>;
   rubStatuses: Map<string, SectionWithStatus>;
   modeColor: string;
+  fromView?: string;
   onMark: (sectionId: string, sectionType: 'juz' | 'hizb' | 'rub') => void;
   onUndo: (sectionId: string) => void;
   onDifficulty: (sectionId: string, difficulty: DifficultyLevel | null) => void;
@@ -25,7 +26,7 @@ const DIFF: { key: DifficultyLevel; label: string; color: string }[] = [
 ];
 
 export default function JuzCard({
-  juz, sectionStatus, hizbStatuses, rubStatuses, modeColor, onMark, onUndo, onDifficulty,
+  juz, sectionStatus, hizbStatuses, rubStatuses, modeColor, fromView = 'juz', onMark, onUndo, onDifficulty,
 }: JuzCardProps) {
   const [expanded, setExpanded] = useState(false);
   const hizbs = getHizbsForJuz(juz.number);
@@ -98,6 +99,7 @@ export default function JuzCard({
                 sectionStatus={hs}
                 rubStatuses={rubStatuses}
                 modeColor={modeColor}
+                fromView={fromView}
                 onMark={onMark}
                 onUndo={onUndo}
                 onDifficulty={onDifficulty}

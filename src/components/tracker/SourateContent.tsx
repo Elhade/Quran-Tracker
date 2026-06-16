@@ -37,7 +37,7 @@ export default function SourateContent({ surah, rubId, status, modeColor, indent
 
       <div className="flex-1 min-w-0 overflow-hidden">
         {surah.firstVerseArabic && (
-          <p className="text-[13px] text-[#2c2825] text-right truncate" dir="rtl"
+          <p className="text-[15px] text-[#2c2825] text-right truncate" dir="rtl"
              style={{ fontFamily: 'var(--font-amiri)', lineHeight: '2', paddingTop: '2px', paddingBottom: '2px' }}>
             {surah.firstVerseArabic.length > 65 ? surah.firstVerseArabic.slice(0, 65) + '…' : surah.firstVerseArabic}
           </p>

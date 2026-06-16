@@ -1,9 +1,9 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Amiri } from 'next/font/google';
+import { Inter, Scheherazade_New } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const amiri = Amiri({ subsets: ['arabic'], weight: ['400', '700'], variable: '--font-amiri' });
+const amiri = Scheherazade_New({ subsets: ['arabic'], weight: ['400', '700'], variable: '--font-amiri' });
 
 export const metadata: Metadata = {
   title: 'Quran Tracker',

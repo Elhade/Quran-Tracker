@@ -13,6 +13,7 @@ interface HizbCardProps {
   sectionStatus: SectionWithStatus;
   rubStatuses: Map<string, SectionWithStatus>;
   modeColor: string;
+  fromView?: string;
   onMark: (sectionId: string, sectionType: 'hizb' | 'rub') => void;
   onUndo: (sectionId: string) => void;
   onDifficulty: (sectionId: string, difficulty: DifficultyLevel | null) => void;
@@ -25,7 +26,7 @@ const DIFF: { key: DifficultyLevel; label: string; color: string }[] = [
 ];
 
 export default function HizbCard({
-  hizb, sectionStatus, rubStatuses, modeColor, onMark, onUndo, onDifficulty,
+  hizb, sectionStatus, rubStatuses, modeColor, fromView, onMark, onUndo, onDifficulty,
 }: HizbCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -54,7 +55,7 @@ export default function HizbCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <Link href={`/detail/hizb/${hizb.id}`} className="block" onClick={e => e.stopPropagation()}>
+          <Link href={`/detail/hizb/${hizb.id}${fromView ? `?from=${fromView}` : ''}`} className="block" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[13px] font-semibold text-[#1a1714]">Hizb {hizb.number}</span>
               {multiplier > 1 && (

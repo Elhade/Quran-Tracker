@@ -5,7 +5,7 @@ import TrackerHeader from '@/components/tracker/TrackerHeader';
 import JuzCard from '@/components/tracker/JuzCard';
 import HizbCard from '@/components/tracker/HizbCard';
 import SourateCard from '@/components/tracker/SourateCard';
-import FilterBar, { type ViewType } from '@/components/tracker/FilterBar';
+import FilterBar, { type ViewType, type StatusFilter } from '@/components/tracker/FilterBar';
 import { useTrackerStore } from '@/store/useTrackerStore';
 import { useModeStore } from '@/store/useModeStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -17,15 +17,22 @@ import { computeCycleStats } from '@/lib/tracker/cycle-engine';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 
-type StatusFilter = SectionStatus | 'all';
-
 export default function GroupTrackerPage() {
   const { activeMode, getModeColor, getModeHeaderBg } = useModeStore();
   const { getModeSettings, updateModeSettings } = useSettingsStore();
-  const { loadData, getSectionsWithStatus, markAsRevised, undoRevision, setDifficulty } = useTrackerStore();
+  const { loadData, sections: rawSections, getSectionsWithStatus, markAsRevised, undoRevision, setDifficulty, todayRevisionIds } = useTrackerStore();
 
   const [viewType, setViewType] = useState<ViewType>('juz');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view') as ViewType | null;
+    if (view && (['juz', 'hizb', 'sourate'] as ViewType[]).includes(view)) {
+      setViewType(view);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   const { cycleDays, cycleStartDate } = getModeSettings(activeMode);
   const modeColor = getModeColor();
@@ -43,6 +50,12 @@ export default function GroupTrackerPage() {
   const derivedSurahSections = useMemo<SectionWithStatus[]>(() => {
     const hizbMap = new Map(allSections.filter(s => s.sectionType === 'hizb').map(s => [s.sectionId, s]));
     const rubMap  = new Map(allSections.filter(s => s.sectionType === 'rub').map(s => [s.sectionId, s]));
+    // Sourate-specific difficulties stored directly (isSelected may be false)
+    const surahDiffMap = new Map(
+      rawSections
+        .filter(s => s.sectionType === 'sourate' && s.modeKey === activeMode)
+        .map(s => [s.sectionId, s.difficulty])
+    );
 
     const pickStatus = (ss: SectionStatus[]): SectionStatus => {
       if (ss.some(s => s === 'overdue')) return 'overdue';
@@ -83,12 +96,13 @@ export default function GroupTrackerPage() {
       return [{
         sectionId: surah.id, sectionType: 'sourate' as const,
         status: pickStatus(statuses),
-        difficulty: null, lastRevisionDate: null, nextRevisionDate: null,
+        difficulty: surahDiffMap.get(surah.id) ?? null,
+        lastRevisionDate: null, nextRevisionDate: null,
         revisionCount: 0, individualCycleDays: cycleDays,
         internalCycleMultiplier: 1, notes: '',
       }];
     });
-  }, [allSections, cycleDays]);
+  }, [allSections, cycleDays, rawSections, activeMode]);
 
   // Sections scoped to current view type
   const viewSections: SectionWithStatus[] = viewType === 'juz'
@@ -97,35 +111,77 @@ export default function GroupTrackerPage() {
       ? allSections.filter(s => s.sectionType === 'hizb')
       : derivedSurahSections;
 
-  // KPI stats scoped to current view type (exclude rubs from counts)
-  const doneSections = viewSections.filter(s => s.status === 'done').length;
-  const todayCount = doneSections;
-  const stats = viewSections.length > 0 ? computeCycleStats({
-    totalSections: viewSections.length,
-    completedSections: doneSections,
-    cycleDays,
-    startDate: cycleStartDate,
-    revisionsToday: todayCount,
-  }) : null;
+  // Header KPIs — vary by active view type
+  const isDoneThisCycle = (s: SectionWithStatus) => s.status === 'done' || s.status === 'upcoming';
+  const isTodayRevised  = (s: SectionWithStatus) => todayRevisionIds.has(`${activeMode}:${s.sectionId}`);
 
-  // 'today' chip covers both today + overdue (read now to stay on track)
-  const counts: Partial<Record<StatusFilter, number>> = {
-    today: viewSections.filter(s => s.status === 'today' || s.status === 'overdue').length,
-    done: viewSections.filter(s => s.status === 'done').length,
-    upcoming: viewSections.filter(s => s.status === 'upcoming').length,
-    new: viewSections.filter(s => s.status === 'new').length,
+  const allHizbs = allSections.filter(s => s.sectionType === 'hizb');
+  const allJuzs  = allSections.filter(s => s.sectionType === 'juz');
+  const getHizbPages = (id: string) => {
+    const h = HIZBS.find(h => h.id === id);
+    return h ? h.pageEnd - h.pageStart + 1 : 0;
   };
 
-  const statusMatches = (status: SectionStatus | undefined): boolean => {
-    if (!status) return false;
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'today') return status === 'today' || status === 'overdue';
-    return status === statusFilter;
+  let headerCycleTotal: number, headerCycleDone: number,
+      headerTodayDone: number, headerTargetPerDay: number, headerUnit: string;
+
+  if (viewType === 'sourate') {
+    headerCycleTotal   = allHizbs.reduce((sum, s) => sum + getHizbPages(s.sectionId), 0);
+    headerCycleDone    = allHizbs.filter(isDoneThisCycle).reduce((sum, s) => sum + getHizbPages(s.sectionId), 0);
+    headerTodayDone    = allHizbs.filter(isTodayRevised).reduce((sum, s) => sum + getHizbPages(s.sectionId), 0);
+    headerTargetPerDay = cycleDays > 0 ? Math.round(headerCycleTotal / cycleDays) : 0;
+    headerUnit         = 'pages';
+  } else if (viewType === 'juz') {
+    headerCycleTotal   = allJuzs.length;
+    headerCycleDone    = allJuzs.filter(isDoneThisCycle).length;
+    headerTodayDone    = allJuzs.filter(isTodayRevised).length;
+    headerTargetPerDay = cycleDays > 0 ? allJuzs.length / cycleDays : 0;
+    headerUnit         = 'juz';
+  } else {
+    headerCycleTotal   = allHizbs.length;
+    headerCycleDone    = allHizbs.filter(isDoneThisCycle).length;
+    headerTodayDone    = allHizbs.filter(isTodayRevised).length;
+    headerTargetPerDay = cycleDays > 0 ? allHizbs.length / cycleDays : 0;
+    headerUnit         = 'hizb';
+  }
+
+  // If no cycleStartDate, infer start from earliest revision date so KPI4 is meaningful
+  const earliestRevision = allHizbs
+    .map(s => s.lastRevisionDate)
+    .filter((d): d is string => d !== null)
+    .sort()[0] ?? null;
+  const effectiveStartDate = cycleStartDate ?? earliestRevision;
+
+  // Days elapsed/remaining (hizb base for consistency)
+  const cycleStats = allHizbs.length > 0 ? computeCycleStats({
+    totalSections: allHizbs.length,
+    completedSections: allHizbs.filter(isDoneThisCycle).length,
+    cycleDays,
+    startDate: effectiveStartDate,
+    revisionsToday: allHizbs.filter(isTodayRevised).length,
+  }) : null;
+
+  const counts: Partial<Record<StatusFilter, number>> = {
+    non_fait:  viewSections.filter(s => s.status === 'new' || s.status === 'today' || s.status === 'overdue').length,
+    fait:      viewSections.filter(s => s.status === 'done' || s.status === 'upcoming').length,
+    facile:    viewSections.filter(s => s.difficulty === 'facile').length,
+    moyen:     viewSections.filter(s => s.difficulty === 'moyen').length,
+    difficile: viewSections.filter(s => s.difficulty === 'difficile').length,
+  };
+
+  const sectionMatches = (s: SectionWithStatus): boolean => {
+    if (statusFilter === 'all')       return true;
+    if (statusFilter === 'non_fait')  return s.status === 'new' || s.status === 'today' || s.status === 'overdue';
+    if (statusFilter === 'fait')      return s.status === 'done' || s.status === 'upcoming';
+    if (statusFilter === 'facile')    return s.difficulty === 'facile';
+    if (statusFilter === 'moyen')     return s.difficulty === 'moyen';
+    if (statusFilter === 'difficile') return s.difficulty === 'difficile';
+    return false;
   };
 
   const filteredSections = statusFilter === 'all'
     ? viewSections
-    : viewSections.filter(s => statusMatches(s.status));
+    : viewSections.filter(s => sectionMatches(s));
 
   // Status maps by type
   const statusMap = new Map<string, SectionWithStatus>(allSections.map(s => [s.sectionId, s]));
@@ -142,7 +198,7 @@ export default function GroupTrackerPage() {
       return statusMap.has(juz.id) || juz.childrenIds.some((hId: string) => statusMap.has(hId));
     }
     return filteredJuzSectionIds.has(juz.id) ||
-      juz.childrenIds.some((hId: string) => statusMatches(hizbStatusMap.get(hId)?.status));
+      juz.childrenIds.some((hId: string) => { const h = hizbStatusMap.get(hId); return h ? sectionMatches(h) : false; });
   });
 
   // For hizb view: match filteredSections to HIZBS static data
@@ -213,14 +269,17 @@ export default function GroupTrackerPage() {
   return (
     <AppShell>
       <TrackerHeader
-        modeLabel={modeLabel}
-        modeColor={modeColor}
         headerBg={headerBg}
-        todayCount={todayCount}
-        stats={stats}
         cycleDays={cycleDays}
         cycleStartDate={cycleStartDate}
         onReset={() => updateModeSettings(activeMode, { cycleStartDate: null })}
+        daysRemaining={cycleStats?.daysRemaining ?? cycleDays}
+        daysElapsed={cycleStats?.daysElapsed ?? 0}
+        targetPerDay={headerTargetPerDay}
+        cycleDone={headerCycleDone}
+        cycleTotal={headerCycleTotal}
+        todayDone={headerTodayDone}
+        unit={headerUnit}
       />
 
       {hasSections && (
@@ -292,6 +351,7 @@ export default function GroupTrackerPage() {
               sectionStatus={status}
               rubStatuses={rubStatusMap}
               modeColor={modeColor}
+              fromView="hizb"
               onMark={(id, type) => handleMark(id, type)}
               onUndo={handleUndo}
               onDifficulty={handleDifficulty}

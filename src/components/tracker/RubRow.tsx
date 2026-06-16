@@ -44,7 +44,7 @@ export default function RubRow({ rub, status, modeColor, indent = 20, clampPageS
 
       <div className="flex-1 min-w-0 overflow-hidden">
         {rub.verseArabic ? (
-          <p className="text-[13px] text-[#2c2825] text-right truncate" dir="rtl"
+          <p className="text-[15px] text-[#2c2825] text-right truncate" dir="rtl"
              style={{ fontFamily: 'var(--font-amiri)', lineHeight: '2', paddingTop: '2px', paddingBottom: '2px' }}>
             {rub.verseArabic.length > 65 ? rub.verseArabic.slice(0, 65) + '...' : rub.verseArabic}
           </p>

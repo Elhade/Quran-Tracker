@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { ChevronDown, Check, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
 import type { Surah } from '@/types/quran';
 import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
 import StatusBadge from './StatusBadge';
@@ -22,6 +23,12 @@ interface SourateCardProps {
 }
 
 
+const DIFF: { key: DifficultyLevel; label: string; color: string }[] = [
+  { key: 'facile',    label: 'F', color: '#1a7a3c' },
+  { key: 'moyen',     label: 'M', color: '#b8841a' },
+  { key: 'difficile', label: 'D', color: '#c92b2b' },
+];
+
 export default function SourateCard({
   surah, sectionStatus, hizbStatuses, rubStatuses, modeColor, onMark, onUndo, onDifficulty,
 }: SourateCardProps) {
@@ -31,6 +38,7 @@ export default function SourateCard({
   const isOverdue = sectionStatus.status === 'overdue';
   const isToday   = sectionStatus.status === 'today';
   const borderColor = isDone ? '#2d7a4f' : isOverdue ? '#c92b2b' : isToday ? '#b8841a' : '#e2ddd6';
+  const difficulty  = sectionStatus.difficulty;
 
   // Rubs that start in this surah → determines the tier
   const rubsInSurah = getRubsForSurah(surah.number);
@@ -83,16 +91,36 @@ export default function SourateCard({
         </div>
 
         <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[14px] font-semibold text-[#1a1714]">{surah.name}</span>
-            {!isDone && <StatusBadge status={sectionStatus.status} compact />}
-          </div>
-          <span className="text-[11px] text-[#9c9890]">
-            {surah.endAyah} ayats · <span className="text-[#c5c0ba]">{surah.pageEnd - surah.pageStart + 1} pages</span>
-          </span>
+          <Link href={`/detail/sourate/${surah.id}`} className="block" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[14px] font-semibold text-[#1a1714]">{surah.name}</span>
+              {!isDone && <StatusBadge status={sectionStatus.status} compact />}
+            </div>
+            <span className="text-[11px] text-[#9c9890]">
+              {surah.endAyah} ayats · <span className="text-[#c5c0ba]">{surah.pageEnd - surah.pageStart + 1} pages</span>
+            </span>
+          </Link>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Difficulty F/M/D */}
+          {DIFF.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => onDifficulty(surah.id, difficulty === opt.key ? null : opt.key)}
+              className="w-6 h-6 rounded-md text-[10px] font-bold border transition-all flex items-center justify-center"
+              style={difficulty === opt.key
+                ? { background: opt.color, color: '#fff', borderColor: opt.color }
+                : { background: 'transparent', color: opt.color, borderColor: `${opt.color}50` }
+              }
+            >
+              {opt.label}
+            </button>
+          ))}
+
+          <div className="w-px h-4 bg-[#e2ddd6] mx-0.5" />
+
+          {/* Mark / Undo */}
           <button
             onClick={() => isDone ? onUndo(surah.id) : onMark(surah.id, 'sourate')}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
@@ -100,10 +128,11 @@ export default function SourateCard({
           >
             {isDone ? <RotateCcw size={13} /> : <Check size={14} />}
           </button>
+
           {tier !== 'flat' && (
-            <button onClick={() => setExpanded(v => !v)} className="p-1">
+            <button onClick={() => setExpanded(v => !v)} className="w-6 h-6 flex items-center justify-center">
               <ChevronDown
-                size={16}
+                size={15}
                 className="text-[#9c9890] transition-transform"
                 style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}
               />
@@ -125,6 +154,7 @@ export default function SourateCard({
                   hizbStatuses={hizbStatuses}
                   rubStatuses={rubStatuses}
                   modeColor={modeColor}
+                  fromView="sourate"
                   onMark={onMark}
                   onUndo={onUndo}
                   onDifficulty={onDifficulty}
@@ -138,6 +168,7 @@ export default function SourateCard({
                 sectionStatus={hizbStatuses.get(trackedHizb.id)!}
                 rubStatuses={rubStatuses}
                 modeColor={modeColor}
+                fromView="sourate"
                 onMark={(id, type) => onMark(id, type)}
                 onUndo={onUndo}
                 onDifficulty={onDifficulty}
