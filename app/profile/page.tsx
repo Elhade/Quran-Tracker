@@ -1,9 +1,9 @@
 'use client';
-import AppShell from '../../components/layout/AppShell';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import { useModeStore } from '../../store/useModeStore';
-import { useTrackerStore } from '../../store/useTrackerStore';
-import { LOCAL_USER_ID } from '../../config/features';
+import AppShell from '@/components/layout/AppShell';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { useModeStore } from '@/store/useModeStore';
+import { useTrackerStore } from '@/store/useTrackerStore';
+import { LOCAL_USER_ID } from '@/config/features';
 import { User, BookOpen, Brain, Trash2, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 

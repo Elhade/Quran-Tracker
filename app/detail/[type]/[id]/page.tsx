@@ -1,35 +1,35 @@
 'use client';
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import AppShell from '../../../../components/layout/AppShell';
-import { useTrackerStore } from '../../../../store/useTrackerStore';
-import { useModeStore } from '../../../../store/useModeStore';
-import { useSettingsStore } from '../../../../store/useSettingsStore';
-import { LOCAL_USER_ID } from '../../../../config/features';
-import { getSectionById } from '../../../../data/quran/quran-structure';
-import type { SectionType } from '../../../../types/quran';
-import type { DifficultyLevel } from '../../../../types/tracker';
-import DifficultySelector from '../../../../components/tracker/DifficultySelector';
-import StatusBadge from '../../../../components/tracker/StatusBadge';
+import AppShell from '@/components/layout/AppShell';
+import { useTrackerStore } from '@/store/useTrackerStore';
+import { useModeStore } from '@/store/useModeStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { LOCAL_USER_ID } from '@/config/features';
+import { getSectionById } from '@/data/quran/quran-structure';
+import type { SectionType } from '@/types/quran';
+import type { DifficultyLevel } from '@/types/tracker';
+import DifficultySelector from '@/components/tracker/DifficultySelector';
+import StatusBadge from '@/components/tracker/StatusBadge';
 import { ArrowLeft, Check, RotateCcw, BookOpen } from 'lucide-react';
-import { formatDate, daysUntil, isTodayDate } from '../../../../lib/utils/dates';
+import { formatDate, daysUntil, isTodayDate } from '@/lib/utils/dates';
 
 const CYCLE_PRESETS = [3, 7, 10, 21, 30];
 const MULTIPLIERS = [1, 2, 3, 5, 10];
 
 interface PageProps {
-  params: Promise<{ type: string; id: string }>;
+  params: { type: string; id: string };
 }
 
 export default function DetailPage({ params }: PageProps) {
-  const { type, id } = use(params);
+  const { type, id } = params;
   const router = useRouter();
   const { activeMode, getModeColor } = useModeStore();
-  const { settings } = useSettingsStore();
+  const { getModeSettings } = useSettingsStore();
   const { loadData, getSectionsWithStatus, markAsRevised, undoRevision, setDifficulty, setInternalCycle, setNote, getNote, loaded } = useTrackerStore();
 
   const modeColor = getModeColor();
-  const cycleDays = settings?.groupedCycleDays ?? 7;
+  const { cycleDays } = getModeSettings(activeMode);
   const section = getSectionById(id);
 
   const [note, setNoteText] = useState('');

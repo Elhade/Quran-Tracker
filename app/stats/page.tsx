@@ -1,11 +1,10 @@
-'use client';
+﻿'use client';
 import { useEffect } from 'react';
-import AppShell from '../../components/layout/AppShell';
-import { useTrackerStore } from '../../store/useTrackerStore';
-import { useModeStore } from '../../store/useModeStore';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import { LOCAL_USER_ID } from '../../config/features';
-import { computeStreak, computeAppStats } from '../../lib/tracker/stats-engine';
+import AppShell from '@/components/layout/AppShell';
+import { useTrackerStore } from '@/store/useTrackerStore';
+import { useModeStore } from '@/store/useModeStore';
+import { LOCAL_USER_ID } from '@/config/features';
+import { computeStreak, computeAppStats } from '@/lib/tracker/stats-engine';
 import { BarChart2, TrendingUp, Calendar, BookOpen, Flame, Award } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
@@ -27,7 +26,6 @@ function StatCard({ icon: Icon, label, value, color }: { icon: any; label: strin
 
 export default function StatsPage() {
   const { activeMode, getModeColor } = useModeStore();
-  const { settings } = useSettingsStore();
   const { loadData, dailyProgress, revisions, sections, getTotalRevisionCount } = useTrackerStore();
 
   const modeColor = getModeColor();
