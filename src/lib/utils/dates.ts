@@ -12,11 +12,13 @@ export function formatDate(date: string | Date): string {
 
 export function daysAgo(date: string | null): number {
   if (!date) return 999;
-  return differenceInDays(new Date(), parseISO(date));
+  // Use calendar-day comparison (both at midnight) to avoid time-of-day drift
+  return differenceInDays(parseISO(today()), parseISO(date));
 }
 
 export function daysUntil(date: string): number {
-  return differenceInDays(parseISO(date), new Date());
+  // Use calendar-day comparison (both at midnight) to avoid time-of-day drift
+  return differenceInDays(parseISO(date), parseISO(today()));
 }
 
 export function addDaysToDate(date: string, days: number): string {

@@ -1,9 +1,11 @@
 'use client';
+import { useState } from 'react';
 import { RotateCcw, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 interface TrackerHeaderProps {
   headerBg: string;
+  mode: string;
   cycleDays: number;
   cycleStartDate: string | null;
   onReset: () => void;
@@ -17,33 +19,42 @@ interface TrackerHeaderProps {
 }
 
 export default function TrackerHeader({
-  headerBg, cycleDays, cycleStartDate, onReset,
+  headerBg, mode, cycleDays, cycleStartDate, onReset,
   daysRemaining, daysElapsed, targetPerDay,
   cycleDone, cycleTotal, todayDone, unit,
 }: TrackerHeaderProps) {
+  const [confirming, setConfirming] = useState(false);
+
   const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1);
 
   const cyclePercent = cycleTotal > 0 ? Math.round((cycleDone / cycleTotal) * 100) : 0;
 
-  // KPI 3 — aujourd'hui + statut rythme
   const todayPct   = targetPerDay > 0 ? Math.min(100, Math.round((todayDone / targetPerDay) * 100)) : 0;
-  const todayColor = todayDone >= targetPerDay && targetPerDay > 0 ? '#4ade80' : 'white';
+  const accent     = mode === 'memorisation' ? '#86efac' : '#1e3a8a';
+  const todayColor = todayDone >= targetPerDay && targetPerDay > 0 ? accent : '#ffffff';
 
-  const hasElapsed  = daysElapsed > 0;
-  const paceRef     = hasElapsed ? cycleDone : todayDone;
-  const paceExp     = hasElapsed ? Math.round(targetPerDay * daysElapsed) : Math.round(targetPerDay);
-  const paceDelta   = paceRef - paceExp;
-  const paceLabel   = paceDelta > 0 ? 'en avance' : paceDelta < 0 ? 'en retard' : 'à jour';
-  const paceColor   = paceDelta > 0 ? '#4ade80' : paceDelta < 0 ? '#f87171' : 'rgba(255,255,255,0.55)';
-  const catchUp     = hasElapsed && paceDelta < 0 ? Math.abs(paceDelta) : 0;
+  const hasElapsed = daysElapsed > 0;
+  const paceRef    = hasElapsed ? cycleDone : todayDone;
+  const paceExp    = hasElapsed ? Math.round(targetPerDay * daysElapsed) : Math.round(targetPerDay);
+  const paceDelta  = paceRef - paceExp;
+  const isLate     = hasElapsed && paceDelta < 0;
+  const paceLabel  = paceDelta > 0 ? 'en avance' : isLate ? 'en retard' : 'à jour';
+  const paceColor  = paceDelta > 0 ? accent : isLate ? '#fde68a' : '#ffffff';
+  const catchUp    = isLate ? Math.abs(paceDelta) : 0;
 
+  const title      = mode === 'lecture' ? 'Lecture du Coran' : 'Révision du Coran';
   const startLabel = cycleStartDate
     ? `Démarré le ${new Date(cycleStartDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`
     : `Cycle de ${cycleDays} jours`;
 
-  const block = { background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.18)' };
-  const sub   = { color: 'rgba(255,255,255,0.6)' };
-  const muted = { color: 'rgba(255,255,255,0.4)' };
+  const block = { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' };
+  const sub   = { color: '#ffffff' };
+  const muted = { color: '#ffffff' };
+
+  const handleReset = () => {
+    onReset();
+    setConfirming(false);
+  };
 
   return (
     <div style={{ background: headerBg }} className="px-5 pt-5 pb-4">
@@ -51,9 +62,9 @@ export default function TrackerHeader({
       <div className="flex items-start justify-between mb-4">
         <div>
           <h1 className="text-[20px] font-bold text-white tracking-tight leading-tight">
-            Révision du Coran
+            {title}
           </h1>
-          <p className="text-[12px] mt-0.5" style={{ color: 'rgba(255,255,255,0.65)' }}>
+          <p className="text-[12px] mt-0.5 text-white/80">
             {startLabel}
           </p>
         </div>
@@ -108,11 +119,11 @@ export default function TrackerHeader({
               <span className="text-[10px] font-bold uppercase tracking-wide mt-0.5" style={sub}>
                 Aujourd'hui
               </span>
-              <div className="h-[3px] rounded-full mt-1.5" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                <div className="h-full rounded-full" style={{ width: `${todayPct}%`, background: todayColor }} />
+              <div className="h-[3px] rounded-full mt-1.5" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${todayPct}%`, background: todayColor }} />
               </div>
               {catchUp > 0 && (
-                <span className="text-[10px] font-semibold mt-1" style={{ color: '#f87171' }}>
+                <span className="text-[10px] font-semibold mt-1" style={{ color: '#fde68a' }}>
                   retard : {fmt(targetPerDay + catchUp)} {unit} (+{fmt(catchUp)} à rattraper)
                 </span>
               )}
@@ -121,10 +132,10 @@ export default function TrackerHeader({
           </div>
 
           {/* Barre + reset */}
-          <div className="rounded-[13px] px-3.5 pt-3 pb-2.5" style={{ background: 'rgba(0,0,0,0.12)' }}>
+          <div className="rounded-[13px] px-3.5 pt-3 pb-2.5" style={{ background: 'rgba(0,0,0,0.22)' }}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <span className="text-[11px] font-semibold text-white">
                   Avancement du cycle
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: paceColor }}>
@@ -141,14 +152,39 @@ export default function TrackerHeader({
                 style={{ width: `${cyclePercent}%` }}
               />
             </div>
-            <button
-              onClick={onReset}
-              className="w-full py-2 rounded-[9px] text-[12px] font-bold flex items-center justify-center gap-1.5"
-              style={{ border: '1.5px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)' }}
-            >
-              <RotateCcw size={13} />
-              Réinitialiser le cycle
-            </button>
+
+            {confirming ? (
+              <div className="space-y-2">
+                <p className="text-center text-[12px] font-semibold text-white">
+                  Réinitialiser le cycle ?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="flex-1 py-2 rounded-[9px] text-[12px] font-bold text-white"
+                    style={{ border: '1.5px solid rgba(255,255,255,0.3)' }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 py-2 rounded-[9px] text-[12px] font-bold"
+                    style={{ background: 'rgba(255,255,255,0.9)', color: headerBg }}
+                  >
+                    Confirmer
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                className="w-full py-2 rounded-[9px] text-[12px] font-bold text-white flex items-center justify-center gap-1.5"
+                style={{ border: '1.5px solid rgba(255,255,255,0.5)' }}
+              >
+                <RotateCcw size={13} />
+                Réinitialiser le cycle
+              </button>
+            )}
           </div>
         </>
       )}

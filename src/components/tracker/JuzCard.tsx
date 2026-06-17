@@ -1,11 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { ChevronDown, Check, RotateCcw } from 'lucide-react';
+import { daysUntil } from '@/lib/utils/dates';
 import type { Juz } from '@/types/quran';
 import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
 import StatusBadge from './StatusBadge';
 import HizbCard from './HizbCard';
 import { getHizbsForJuz } from '@/data/quran/quran-structure';
+
+const DONE_COLOR = '#2d7a4f';
 
 interface JuzCardProps {
   juz: Juz;
@@ -32,15 +35,17 @@ export default function JuzCard({
   const hizbs = getHizbsForJuz(juz.number);
 
   const isDone    = sectionStatus?.status === 'done';
-  const isOverdue = sectionStatus?.status === 'overdue';
-  const isToday   = sectionStatus?.status === 'today';
 
   const trackedHizbs  = hizbs.filter(h => hizbStatuses.has(h.id));
   const doneHizbs     = trackedHizbs.filter(h => hizbStatuses.get(h.id)?.status === 'done').length;
   const progress      = trackedHizbs.length > 0 ? doneHizbs / trackedHizbs.length : 0;
   const allHizbsDone  = trackedHizbs.length > 0 && doneHizbs === trackedHizbs.length;
 
-  const borderColor = isDone ? '#2d7a4f' : isOverdue ? '#c92b2b' : isToday ? '#b8841a' : '#e2ddd6';
+  const daysToNext = sectionStatus?.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
+  const borderColor = isDone ? DONE_COLOR
+    : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
+    : daysToNext === 0 ? '#f97316'
+    : '#e2ddd6';
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${borderColor}` }}>
@@ -48,7 +53,7 @@ export default function JuzCard({
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-bold flex-shrink-0"
-          style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
+          style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
         >
           {isDone ? <Check size={16} /> : juz.number}
         </div>
@@ -62,7 +67,7 @@ export default function JuzCard({
             <div className="mt-1.5 w-full h-1 bg-[#e2ddd6] rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progress * 100}%`, background: isDone ? '#2d7a4f' : modeColor }}
+                style={{ width: `${progress * 100}%`, background: isDone ? DONE_COLOR : modeColor }}
               />
             </div>
           )}
@@ -72,7 +77,7 @@ export default function JuzCard({
             <button
               onClick={e => { e.stopPropagation(); isDone ? onUndo(juz.id) : onMark(juz.id, 'juz'); }}
               className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-              style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
+              style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
             >
               {isDone ? <RotateCcw size={13} /> : <Check size={14} />}
             </button>

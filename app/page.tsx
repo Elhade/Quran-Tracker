@@ -20,7 +20,7 @@ import { Plus } from 'lucide-react';
 export default function GroupTrackerPage() {
   const { activeMode, getModeColor, getModeHeaderBg } = useModeStore();
   const { getModeSettings, updateModeSettings } = useSettingsStore();
-  const { loadData, sections: rawSections, getSectionsWithStatus, markAsRevised, undoRevision, setDifficulty, todayRevisionIds } = useTrackerStore();
+  const { loadData, sections: rawSections, getSectionsWithStatus, markAsRevised, undoRevision, setDifficulty, todayRevisionIds, resetCycle } = useTrackerStore();
 
   const [viewType, setViewType] = useState<ViewType>('juz');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -44,7 +44,7 @@ export default function GroupTrackerPage() {
   }, [activeMode, loadData]);
 
   // All tracked sections with status
-  const allSections = getSectionsWithStatus(activeMode, cycleDays);
+  const allSections = getSectionsWithStatus(activeMode, cycleDays, cycleStartDate);
 
   // Derive sourate sections from tracked hizbs/rubs
   const derivedSurahSections = useMemo<SectionWithStatus[]>(() => {
@@ -93,13 +93,33 @@ export default function GroupTrackerPage() {
       }
       if (statuses.length === 0) return [];
 
+      // cycleRevisionCount = min across hizbs (= number of full passes through the sourate)
+      // internalCycleMultiplier = common value only if all hizbs agree, else 1
+      const hizbStatEntries = trackedHizbNumbers
+        .map(n => HIZBS.find(h => h.number === n))
+        .filter((h): h is NonNullable<typeof h> => h !== undefined)
+        .map(h => hizbMap.get(h.id))
+        .filter((hs): hs is SectionWithStatus => hs !== undefined);
+      const surahCycleRevCount = hizbStatEntries.length > 0
+        ? Math.min(...hizbStatEntries.map(hs => hs.cycleRevisionCount))
+        : 0;
+      const allSameMultiplier = hizbStatEntries.length > 0
+        && hizbStatEntries.every(hs => hs.internalCycleMultiplier === hizbStatEntries[0].internalCycleMultiplier);
+      const surahMultiplier = allSameMultiplier ? hizbStatEntries[0].internalCycleMultiplier : 1;
+
+      // Earliest next revision date across hizbs (most urgent)
+      const surahNextRevDates = hizbStatEntries
+        .map(hs => hs.nextRevisionDate)
+        .filter((d): d is string => d !== null);
+      const surahNextRevDate = surahNextRevDates.length > 0 ? surahNextRevDates.sort()[0] : null;
+
       return [{
         sectionId: surah.id, sectionType: 'sourate' as const,
         status: pickStatus(statuses),
         difficulty: surahDiffMap.get(surah.id) ?? null,
-        lastRevisionDate: null, nextRevisionDate: null,
-        revisionCount: 0, individualCycleDays: cycleDays,
-        internalCycleMultiplier: 1, notes: '',
+        lastRevisionDate: null, nextRevisionDate: surahNextRevDate,
+        revisionCount: 0, cycleRevisionCount: surahCycleRevCount, individualCycleDays: cycleDays,
+        internalCycleMultiplier: surahMultiplier, notes: '',
       }];
     });
   }, [allSections, cycleDays, rawSections, activeMode]);
@@ -270,9 +290,13 @@ export default function GroupTrackerPage() {
     <AppShell>
       <TrackerHeader
         headerBg={headerBg}
+        mode={activeMode}
         cycleDays={cycleDays}
         cycleStartDate={cycleStartDate}
-        onReset={() => updateModeSettings(activeMode, { cycleStartDate: null })}
+        onReset={() => {
+          resetCycle(LOCAL_USER_ID, activeMode);
+          updateModeSettings(activeMode, { cycleStartDate: new Date().toISOString().split('T')[0] });
+        }}
         daysRemaining={cycleStats?.daysRemaining ?? cycleDays}
         daysElapsed={cycleStats?.daysElapsed ?? 0}
         targetPerDay={headerTargetPerDay}
@@ -291,6 +315,7 @@ export default function GroupTrackerPage() {
             onStatusFilter={setStatusFilter}
             color={modeColor}
             counts={counts}
+            mode={activeMode}
           />
         </div>
       )}

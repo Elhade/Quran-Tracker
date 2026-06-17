@@ -60,7 +60,7 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
   .font-amiri {
-    font-family: 'Amiri', 'Scheherazade New', serif;
+    font-family: var(--font-amiri), 'Scheherazade New', serif;
   }
   .text-qt-primary { color: var(--qt-text); }
   .text-qt-secondary { color: var(--qt-text-secondary); }

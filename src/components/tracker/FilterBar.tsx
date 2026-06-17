@@ -10,6 +10,7 @@ interface FilterBarProps {
   onStatusFilter: (v: StatusFilter) => void;
   color: string;
   counts: Partial<Record<StatusFilter, number>>;
+  mode?: string;
 }
 
 const VIEWS: { key: ViewType; label: string }[] = [
@@ -18,10 +19,10 @@ const VIEWS: { key: ViewType; label: string }[] = [
   { key: 'sourate', label: 'Sourate' },
 ];
 
-const STATUS_CHIPS: { key: StatusFilter; label: string; dot: string }[] = [
-  { key: 'all',      label: 'Tout',     dot: '#9c9890' },
-  { key: 'non_fait', label: 'Non fait', dot: '#b8841a' },
-  { key: 'fait',     label: 'Fait',     dot: '#2d7a4f' },
+const getStatusChips = (mode?: string): { key: StatusFilter; label: string; dot: string }[] => [
+  { key: 'all',      label: 'Tout',                                          dot: '#9c9890' },
+  { key: 'non_fait', label: 'En attente',                                    dot: '#b8841a' },
+  { key: 'fait',     label: mode === 'lecture' ? 'Lu' : 'Revisé',           dot: '#2d7a4f' },
 ];
 
 const DIFF_CHIPS: { key: StatusFilter; label: string; dot: string; activeColor: string }[] = [
@@ -68,8 +69,9 @@ function Chip({
 }
 
 export default function FilterBar({
-  viewType, onViewType, statusFilter, onStatusFilter, color, counts,
+  viewType, onViewType, statusFilter, onStatusFilter, color, counts, mode,
 }: FilterBarProps) {
+  const STATUS_CHIPS = getStatusChips(mode);
   return (
     <div className="space-y-2">
       {/* View type */}

@@ -7,10 +7,10 @@ import type { DifficultyLevel } from '../types/tracker';
 import { today } from '../lib/utils/dates';
 import { computeNextRevisionDate } from '../lib/tracker/cycle-engine';
 import { computeSectionStatus } from '../lib/tracker/status-engine';
-import { JUZS, HIZBS, RUBS } from '../data/quran/quran-structure';
+import { JUZS, HIZBS, RUBS, SURAHS, getRubsForSurah } from '../data/quran/quran-structure';
 import {
   localGetSections, localSaveSection, localSaveSections,
-  localAddRevision, localUndoRevision, localGetRevisions,
+  localAddRevision, localUndoRevision, localGetRevisions, localClearRevisions,
   localGetDailyProgress, localSaveDailyProgress,
   localGetNote, localSaveNote,
 } from '../lib/providers/LocalTrackerProvider';
@@ -156,7 +156,7 @@ interface TrackerState {
   loaded: boolean;
 
   loadData: (userId: string, modeKey: string) => void;
-  getSectionsWithStatus: (modeKey: string, cycleDays: number) => SectionWithStatus[];
+  getSectionsWithStatus: (modeKey: string, cycleDays: number, cycleStartDate?: string | null) => SectionWithStatus[];
   markAsRevised: (userId: string, modeKey: string, sectionId: string, sectionType: SectionType, cycleDays: number, difficulty?: DifficultyLevel) => void;
   undoRevision: (userId: string, modeKey: string, sectionId: string) => void;
   setDifficulty: (userId: string, modeKey: string, sectionId: string, sectionType: SectionType, difficulty: DifficultyLevel | null) => void;
@@ -165,6 +165,7 @@ interface TrackerState {
   clearSelections: (userId: string, modeKey: string) => void;
   setNote: (userId: string, sectionType: string, sectionId: string, note: string) => void;
   getNote: (userId: string, sectionType: string, sectionId: string) => string;
+  resetCycle: (userId: string, modeKey: string) => void;
   isSectionRevised: (sectionId: string, modeKey: string) => boolean;
   getTodayCount: (modeKey: string) => number;
   getTotalRevisionCount: (modeKey: string) => number;
@@ -234,7 +235,7 @@ export const useTrackerStore = create<TrackerState>()(
         });
       },
 
-      getSectionsWithStatus: (modeKey, cycleDays) => {
+      getSectionsWithStatus: (modeKey, cycleDays, cycleStartDate) => {
         const { sections, revisions } = get();
         const modeSections = sections.filter(s => s.modeKey === modeKey && s.isSelected);
         const modeRevisions = revisions.filter(r => r.modeKey === modeKey);
@@ -249,6 +250,10 @@ export const useTrackerStore = create<TrackerState>()(
           const status = lastRev && revisionMap.get(s.sectionId) === today()
             ? 'done'
             : computeSectionStatus(lastRev, nextRev, effectiveDays);
+          const allRevs = modeRevisions.filter(r => r.sectionId === s.sectionId);
+          const cycleRevisionCount = cycleStartDate
+            ? allRevs.filter(r => r.revisionDate >= cycleStartDate).length
+            : allRevs.length;
           return {
             sectionId: s.sectionId,
             sectionType: s.sectionType,
@@ -256,7 +261,8 @@ export const useTrackerStore = create<TrackerState>()(
             difficulty: s.difficulty,
             lastRevisionDate: lastRev,
             nextRevisionDate: nextRev,
-            revisionCount: modeRevisions.filter(r => r.sectionId === s.sectionId).length,
+            revisionCount: allRevs.length,
+            cycleRevisionCount,
             individualCycleDays: s.individualCycleDays,
             internalCycleMultiplier: s.internalCycleMultiplier,
             notes: s.notes,
@@ -346,6 +352,27 @@ export const useTrackerStore = create<TrackerState>()(
 
       setInternalCycle: (userId, modeKey, sectionId, sectionType, multiplier) => {
         const { sections } = get();
+
+        // Cascade to all tracked hizbs when set on a sourate
+        if (sectionType === 'sourate') {
+          const surah = SURAHS.find(s => s.id === sectionId);
+          if (!surah) return;
+          const rubsInSurah = getRubsForSurah(surah.number);
+          const hizbIds = Array.from(new Set(rubsInSurah.map(r => `hizb-${r.hizbNumber}`)))
+            .filter(id => sections.some(s => s.sectionId === id && s.modeKey === modeKey));
+          let newSections = [...sections];
+          for (const hizbId of hizbIds) {
+            const hizb = newSections.find(s => s.sectionId === hizbId && s.modeKey === modeKey);
+            if (!hizb) continue;
+            const updated = { ...hizb, internalCycleMultiplier: multiplier, updatedAt: new Date().toISOString() };
+            localSaveSection(updated);
+            newSections = newSections.filter(s => !(s.sectionId === hizbId && s.modeKey === modeKey));
+            newSections.push(updated);
+          }
+          set({ sections: newSections });
+          return;
+        }
+
         const section = sections.find(s => s.sectionId === sectionId && s.modeKey === modeKey);
         if (!section) return;
         const updated = { ...section, internalCycleMultiplier: multiplier, updatedAt: new Date().toISOString() };
@@ -400,6 +427,14 @@ export const useTrackerStore = create<TrackerState>()(
 
       getNote: (userId, sectionType, sectionId) => {
         return localGetNote(userId, sectionType, sectionId);
+      },
+
+      resetCycle: (userId, modeKey) => {
+        localClearRevisions(userId, modeKey);
+        const { revisions, todayRevisionIds } = get();
+        const newRevisions = revisions.filter(r => !(r.modeKey === modeKey));
+        const newTodayIds = new Set(Array.from(todayRevisionIds).filter(k => !k.startsWith(`${modeKey}:`)));
+        set({ revisions: newRevisions, todayRevisionIds: newTodayIds });
       },
 
       isSectionRevised: (sectionId, modeKey) => {

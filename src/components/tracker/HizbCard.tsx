@@ -1,12 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { ChevronDown, Check, RotateCcw } from 'lucide-react';
+import { daysUntil } from '@/lib/utils/dates';
 import Link from 'next/link';
 import type { Hizb } from '@/types/quran';
 import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
-import StatusBadge from './StatusBadge';
 import RubRow from './RubRow';
 import { getRubsForHizb } from '@/data/quran/quran-structure';
+
+const DONE_COLOR = '#2d7a4f';
 
 interface HizbCardProps {
   hizb: Hizb;
@@ -31,13 +33,14 @@ export default function HizbCard({
   const [expanded, setExpanded] = useState(false);
 
   const isDone     = sectionStatus.status === 'done';
-  const isOverdue  = sectionStatus.status === 'overdue';
-  const isToday    = sectionStatus.status === 'today';
-  const borderColor = isDone ? '#2d7a4f' : isOverdue ? '#c92b2b' : isToday ? '#b8841a' : '#e2ddd6';
+  const daysToNext = sectionStatus.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
+  const borderColor = isDone ? DONE_COLOR
+    : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
+    : daysToNext === 0 ? '#f97316'
+    : '#e2ddd6';
 
   const rubs       = getRubsForHizb(hizb.number);
   const doneRubs   = rubs.filter(r => rubStatuses.get(r.id)?.status === 'done').length;
-  const rubProgress = rubs.length > 0 ? doneRubs / rubs.length : 0;
 
   const difficulty = sectionStatus.difficulty;
   const multiplier = sectionStatus.internalCycleMultiplier ?? 1;
@@ -48,7 +51,7 @@ export default function HizbCard({
         {/* Number badge */}
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-bold flex-shrink-0"
-          style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
+          style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
         >
           {isDone ? <Check size={16} /> : hizb.number}
         </div>
@@ -63,10 +66,9 @@ export default function HizbCard({
                   className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                   style={{ background: `${modeColor}18`, color: modeColor }}
                 >
-                  ×{multiplier}
+                  {sectionStatus.cycleRevisionCount}/{multiplier}
                 </span>
               )}
-              {!isDone && <StatusBadge status={sectionStatus.status} compact />}
             </div>
             <span className="text-[10px] text-[#9c9890]">
               Juz {hizb.juzNumber} · <span className="text-[#c5c0ba]">{hizb.pageEnd - hizb.pageStart + 1} pages</span>
@@ -75,7 +77,7 @@ export default function HizbCard({
           <div className="flex items-center gap-2 mt-0.5">
             <span
               className="text-[10px] font-bold tabular-nums"
-              style={{ color: isDone ? '#2d7a4f' : doneRubs > 0 ? modeColor : '#c0bcb6' }}
+              style={{ color: isDone ? DONE_COLOR : doneRubs > 0 ? modeColor : '#c0bcb6' }}
             >
               {doneRubs}/4
             </span>
@@ -84,7 +86,7 @@ export default function HizbCard({
                 <span
                   key={i}
                   className="block w-4 h-1 rounded-full"
-                  style={{ background: i < doneRubs ? (isDone ? '#2d7a4f' : modeColor) : '#e2ddd6' }}
+                  style={{ background: i < doneRubs ? (isDone ? DONE_COLOR : modeColor) : '#e2ddd6' }}
                 />
               ))}
             </div>
@@ -93,7 +95,6 @@ export default function HizbCard({
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Difficulty F/M/D */}
           {DIFF.map(opt => (
             <button
               key={opt.key}
@@ -110,16 +111,14 @@ export default function HizbCard({
 
           <div className="w-px h-4 bg-[#e2ddd6] mx-0.5" />
 
-          {/* Mark / Undo */}
           <button
             onClick={() => isDone ? onUndo(hizb.id) : onMark(hizb.id, 'hizb')}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-            style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
+            style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
           >
             {isDone ? <RotateCcw size={13} /> : <Check size={14} />}
           </button>
 
-          {/* Expand rubs */}
           <button
             onClick={() => setExpanded(v => !v)}
             className="w-6 h-6 flex items-center justify-center"

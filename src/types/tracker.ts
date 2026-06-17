@@ -112,6 +112,7 @@ export interface SectionWithStatus {
   lastRevisionDate: string | null;
   nextRevisionDate: string | null;
   revisionCount: number;
+  cycleRevisionCount: number;
   individualCycleDays: number;
   internalCycleMultiplier: number;
   notes: string;

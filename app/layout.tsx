@@ -1,9 +1,17 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Scheherazade_New } from 'next/font/google';
+import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const amiri = Scheherazade_New({ subsets: ['arabic'], weight: ['400', '700'], variable: '--font-amiri' });
+const amiri = localFont({
+  src: [
+    { path: '../public/fonts/scheherazade-new-arabic-400.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/scheherazade-new-arabic-700.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-amiri',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Quran Tracker',

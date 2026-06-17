@@ -441,7 +441,7 @@ export default function ConfigPage() {
                                 {hizbSelected && <Check size={10} className="text-white" />}
                               </div>
                               <span className="text-[13px] text-[#1a1714]">Hizb {hizb.number}</span>
-                              <span className="text-[11px] text-[#9c9890] ml-auto">{hizb.pageEnd - hizb.pageStart + 1} p.</span>
+                              <span className="text-[11px] text-[#9c9890] ml-auto">{hizb.pageEnd - hizb.pageStart + 1} pages</span>
                             </div>
                           );
                         })}

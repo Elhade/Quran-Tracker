@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { RotateCcw, BarChart2 } from 'lucide-react';
+import { Home, BarChart2 } from 'lucide-react';
 import { useModeStore } from '../../store/useModeStore';
 
 export default function BottomNav() {
@@ -15,7 +15,7 @@ export default function BottomNav() {
   };
 
   const navItems = [
-    { href: '/', label: 'Groupe', icon: RotateCcw, matchPath: '/' },
+    { href: '/', label: 'Home', icon: Home, matchPath: '/' },
     { href: '/stats', label: 'Stats', icon: BarChart2, matchPath: '/stats' },
   ];
 

@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { daysUntil } from '@/lib/utils/dates';
 import { ChevronDown, Check, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import type { Surah } from '@/types/quran';
 import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
-import StatusBadge from './StatusBadge';
 import RubRow from './RubRow';
 import SourateContent from './SourateContent';
 import HizbCard from './HizbCard';
@@ -29,15 +29,19 @@ const DIFF: { key: DifficultyLevel; label: string; color: string }[] = [
   { key: 'difficile', label: 'D', color: '#c92b2b' },
 ];
 
+const DONE_COLOR = '#2d7a4f';
+
 export default function SourateCard({
   surah, sectionStatus, hizbStatuses, rubStatuses, modeColor, onMark, onUndo, onDifficulty,
 }: SourateCardProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const isDone    = sectionStatus.status === 'done';
-  const isOverdue = sectionStatus.status === 'overdue';
-  const isToday   = sectionStatus.status === 'today';
-  const borderColor = isDone ? '#2d7a4f' : isOverdue ? '#c92b2b' : isToday ? '#b8841a' : '#e2ddd6';
+  const isDone     = sectionStatus.status === 'done';
+  const daysToNext = sectionStatus.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
+  const borderColor = isDone ? DONE_COLOR
+    : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
+    : daysToNext === 0 ? '#f97316'
+    : '#e2ddd6';
   const difficulty  = sectionStatus.difficulty;
 
   // Rubs that start in this surah → determines the tier
@@ -85,7 +89,7 @@ export default function SourateCard({
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center text-[12px] font-bold flex-shrink-0"
-          style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
+          style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}15`, color: modeColor }}
         >
           {isDone ? <Check size={16} /> : surah.number}
         </div>
@@ -94,7 +98,14 @@ export default function SourateCard({
           <Link href={`/detail/sourate/${surah.id}`} className="block" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[14px] font-semibold text-[#1a1714]">{surah.name}</span>
-              {!isDone && <StatusBadge status={sectionStatus.status} compact />}
+              {sectionStatus.internalCycleMultiplier > 1 && (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={{ background: `${modeColor}18`, color: modeColor }}
+                >
+                  {sectionStatus.cycleRevisionCount}/{sectionStatus.internalCycleMultiplier}
+                </span>
+              )}
             </div>
             <span className="text-[11px] text-[#9c9890]">
               {surah.endAyah} ayats · <span className="text-[#c5c0ba]">{surah.pageEnd - surah.pageStart + 1} pages</span>
@@ -124,7 +135,7 @@ export default function SourateCard({
           <button
             onClick={() => isDone ? onUndo(surah.id) : onMark(surah.id, 'sourate')}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-            style={isDone ? { background: '#2d7a4f', color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
+            style={isDone ? { background: DONE_COLOR, color: '#fff' } : { background: `${modeColor}18`, color: modeColor }}
           >
             {isDone ? <RotateCcw size={13} /> : <Check size={14} />}
           </button>

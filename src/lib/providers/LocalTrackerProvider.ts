@@ -105,6 +105,11 @@ export function localUndoRevision(userId: string, modeKey: string, sectionId: st
   safeSave(STORAGE_KEYS.revisions, stored);
 }
 
+export function localClearRevisions(userId: string, modeKey: string): void {
+  const stored = safeGet<RevisionLog[]>(STORAGE_KEYS.revisions, []);
+  safeSave(STORAGE_KEYS.revisions, stored.filter(r => !(r.userId === userId && r.modeKey === modeKey)));
+}
+
 export function localGetRevisions(userId: string, modeKey: string, limit = 200): RevisionLog[] {
   const stored = safeGet<RevisionLog[]>(STORAGE_KEYS.revisions, []);
   return stored
