@@ -1,4 +1,4 @@
-import type { TrackerSettings, TrackedSection, RevisionLog, DailyProgress, Cycle } from '../../types/tracker';
+import type { TrackerSettings, TrackedSection, RevisionLog, DailyProgress } from '../../types/tracker';
 import type { SectionType } from '../../types/quran';
 import { today, addDaysToDate } from '../utils/dates';
 import { generateId } from '../utils/ids';
@@ -143,4 +143,20 @@ export function localSaveNote(userId: string, sectionType: string, sectionId: st
   const stored = safeGet<Record<string, string>>(STORAGE_KEYS.notes, {});
   stored[`${userId}:${sectionType}:${sectionId}`] = note;
   safeSave(STORAGE_KEYS.notes, stored);
+}
+
+export function localGetAllNotes(userId: string): Array<{ sectionType: string; sectionId: string; note: string }> {
+  const stored = safeGet<Record<string, string>>(STORAGE_KEYS.notes, {});
+  const prefix = `${userId}:`;
+  return Object.entries(stored)
+    .filter(([key, note]) => key.startsWith(prefix) && note.trim() !== '')
+    .map(([key, note]) => {
+      const rest = key.slice(prefix.length);
+      const colonIdx = rest.indexOf(':');
+      return {
+        sectionType: rest.slice(0, colonIdx),
+        sectionId: rest.slice(colonIdx + 1),
+        note,
+      };
+    });
 }

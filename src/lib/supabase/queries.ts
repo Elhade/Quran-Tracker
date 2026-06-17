@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './client';
-import type { DbTrackerSettings, DbTrackedSection, DbRevisionLog, DbDailyProgress, DbCycle, DbProfile } from '../../types/database';
+import type { DbTrackerSettings, DbTrackedSection, DbRevisionLog, DbDailyProgress, DbCycle, DbProfile } from '../../types/database.dto';
 import type { TrackerSettings, TrackedSection, RevisionLog, DailyProgress, Cycle, SectionWithStatus } from '../../types/tracker';
 import type { SectionType, ModeKey } from '../../types/quran';
 import { LOCAL_USER_ID } from '../../config/features';
@@ -38,6 +38,12 @@ function mapDbSection(db: DbTrackedSection): TrackedSection {
     updatedAt: db.updated_at,
     createdAt: db.created_at,
   };
+}
+
+export async function getProfile(userId: string): Promise<DbProfile | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  return data ?? null;
 }
 
 export async function getOrCreateProfile(userId: string): Promise<DbProfile> {

@@ -6,13 +6,16 @@ import { useTrackerStore } from '@/store/useTrackerStore';
 import { useModeStore } from '@/store/useModeStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { LOCAL_USER_ID } from '@/config/features';
+import { useAuthStore } from '@/store/useAuthStore';
+import { upsertNote } from '@/lib/supabase/queries';
 import { getSectionById, HIZBS, RUBS, SURAHS, getRubsForSurah } from '@/data/quran/quran-structure';
 import type { SectionType } from '@/types/quran';
 import type { DifficultyLevel, SectionStatus, SectionWithStatus } from '@/types/tracker';
 import DifficultySelector from '@/components/tracker/DifficultySelector';
 import StatusBadge from '@/components/tracker/StatusBadge';
 import { ArrowLeft, Check, RotateCcw } from 'lucide-react';
-import { daysUntil, daysAgo, isPastDate } from '@/lib/utils/dates';
+import { daysUntil, daysAgo, isPastDate, today as getToday } from '@/lib/utils/dates';
+import { computeNextRevisionDate } from '@/lib/tracker/cycle-engine';
 
 const CYCLE_PRESETS = [3, 5, 7, 15, 30];
 const MULTIPLIERS = [1, 2, 3, 5, 10];
@@ -47,6 +50,8 @@ export default function DetailPage({ params }: PageProps) {
 
   const [note, setNoteText] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
+  const [diffSaved, setDiffSaved] = useState(false);
+  const [multSaved, setMultSaved] = useState(false);
   const [fromView, setFromView] = useState<string | null>(null);
   const [pendingMultiplier, setPendingMultiplier] = useState<number | null>(null);
   const [confirmText, setConfirmText] = useState<string | null>(null);
@@ -204,6 +209,8 @@ export default function DetailPage({ params }: PageProps) {
 
   const handleDifficulty = (difficulty: DifficultyLevel | null) => {
     setDifficulty(LOCAL_USER_ID, activeMode, id, section.type as SectionType, difficulty as DifficultyLevel);
+    setDiffSaved(true);
+    setTimeout(() => setDiffSaved(false), 1800);
   };
 
   // Returns sibling hizb IDs if this hizb belongs to a sourate where all tracked hizbs share the same ×N > 1
@@ -239,7 +246,6 @@ export default function DetailPage({ params }: PageProps) {
   };
 
   const applyMultiplier = (mult: number, siblingIds: string[] = []) => {
-    // Reset sibling hizbs to ×1 before applying the individual coef
     for (const sibId of siblingIds) {
       setInternalCycle(LOCAL_USER_ID, activeMode, sibId, 'hizb', 1);
     }
@@ -247,6 +253,8 @@ export default function DetailPage({ params }: PageProps) {
     setPendingMultiplier(null);
     setConfirmText(null);
     setPendingSiblingIds([]);
+    setMultSaved(true);
+    setTimeout(() => setMultSaved(false), 1800);
   };
 
   const handleMultiplier = (mult: number) => {
@@ -271,6 +279,8 @@ export default function DetailPage({ params }: PageProps) {
     setNote(LOCAL_USER_ID, type, id, note);
     setNoteSaved(true);
     setTimeout(() => setNoteSaved(false), 2000);
+    const { user } = useAuthStore.getState();
+    if (user) upsertNote(user.id, type, id, note).catch(() => {});
   };
 
   const dernAgo = sectionStatus?.lastRevisionDate ? daysAgo(sectionStatus.lastRevisionDate) : null;
@@ -279,7 +289,23 @@ export default function DetailPage({ params }: PageProps) {
     : dernAgo === 1 ? 'Hier'
     : `il y a ${dernAgo} jour${dernAgo > 1 ? 's' : ''}`;
 
-  const prochDays = sectionStatus?.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
+  const effectiveCycleDays = sectionStatus
+    ? (sectionStatus.individualCycleDays > 0 ? sectionStatus.individualCycleDays : cycleDays)
+    : cycleDays;
+
+  const prochDays = (() => {
+    if (!sectionStatus) return null;
+    // Si révisé aujourd'hui, recalculer depuis aujourd'hui pour éviter "Aujourd'hui"
+    if (sectionStatus.status === 'done') {
+      const nextDate = computeNextRevisionDate(
+        getToday(), effectiveCycleDays, sectionStatus.difficulty, sectionStatus.internalCycleMultiplier
+      );
+      return daysUntil(nextDate);
+    }
+    if (!sectionStatus.nextRevisionDate) return null;
+    return daysUntil(sectionStatus.nextRevisionDate);
+  })();
+
   const prochLabel = prochDays === null ? 'Non planifiée'
     : prochDays <= 0 ? "Aujourd'hui"
     : prochDays === 1 ? 'Demain'
@@ -345,7 +371,10 @@ export default function DetailPage({ params }: PageProps) {
         )}
 
         <div className="bg-white rounded-2xl border border-[#e2ddd6] p-4 mb-4">
-          <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide mb-3">Difficulte</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide">Difficulte</h3>
+            {diffSaved && <span className="text-[11px] font-semibold text-[#1a7a3c]">Sauvegarde ✓</span>}
+          </div>
           <DifficultySelector
             value={sectionStatus?.difficulty ?? null}
             onChange={handleDifficulty}
@@ -353,7 +382,10 @@ export default function DetailPage({ params }: PageProps) {
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e2ddd6] p-4 mb-4">
-          <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide mb-3">Multiplicateur de cycle</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide">Multiplicateur de cycle</h3>
+            {multSaved && <span className="text-[11px] font-semibold text-[#1a7a3c]">Sauvegarde ✓</span>}
+          </div>
           <div className="flex gap-2">
             {MULTIPLIERS.map(m => {
               const active = (sectionStatus?.internalCycleMultiplier ?? 1) === m;
@@ -378,22 +410,20 @@ export default function DetailPage({ params }: PageProps) {
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e2ddd6] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide">Notes</h3>
-            <button
-              onClick={handleSaveNote}
-              className="text-[12px] font-semibold"
-              style={{ color: noteSaved ? '#1a7a3c' : modeColor }}
-            >
-              {noteSaved ? 'Sauvegarde' : 'Sauvegarder'}
-            </button>
-          </div>
+          <h3 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide mb-3">Notes</h3>
           <textarea
             value={note}
             onChange={e => setNoteText(e.target.value)}
             placeholder="Ajoutez des notes sur cette section..."
-            className="w-full h-24 bg-[#f5f3ef] rounded-xl px-3 py-2.5 text-[13px] text-[#1a1714] placeholder-[#9c9890] border-0 outline-none resize-none"
+            className="w-full h-24 bg-[#f5f3ef] rounded-xl px-3 py-2.5 text-[13px] text-[#1a1714] placeholder-[#9c9890] border-0 outline-none resize-none mb-3"
           />
+          <button
+            onClick={handleSaveNote}
+            className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
+            style={{ background: noteSaved ? '#1a7a3c' : `${modeColor}15`, color: noteSaved ? '#fff' : modeColor }}
+          >
+            {noteSaved ? 'Note sauvegardee ✓' : 'Sauvegarder la note'}
+          </button>
         </div>
       </div>
 

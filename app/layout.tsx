@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import localFont from 'next/font/local';
+import AuthProvider from '@/components/layout/AuthProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const amiri = localFont({
@@ -33,7 +34,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body className={`${inter.variable} ${amiri.variable} font-sans bg-[#f5f3ef]`}>{children}</body>
+      <body className={`${inter.variable} ${amiri.variable} font-sans bg-[#f5f3ef]`}>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

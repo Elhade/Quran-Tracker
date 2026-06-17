@@ -25,10 +25,11 @@ export default function ConfigPage() {
   const modeLabel = activeMode === 'lecture' ? 'Lecture' : 'Mémorisation';
 
   // Cycle stored per-mode so switching modes reads the correct value without needing an effect
-  const [cycleByMode, setCycleByMode] = useState<Record<string, number>>({});
+  const [cycleByMode, setCycleByMode] = useState<Record<string, number | null>>({});
   const storedCycleDays = getModeSettings(activeMode).cycleDays;
-  // Use the local override for this mode if it exists, otherwise fall back to persisted settings
-  const selectedCycle = cycleByMode[activeMode] ?? storedCycleDays;
+  const selectedCycle = Object.prototype.hasOwnProperty.call(cycleByMode, activeMode)
+    ? cycleByMode[activeMode]
+    : storedCycleDays;
 
   const [customCycle, setCustomCycle] = useState('');
   const [useCustom, setUseCustom] = useState(false);
@@ -59,7 +60,7 @@ export default function ConfigPage() {
     }
   }, [sections, activeMode]);
 
-  const effectiveCycle = useCustom ? (parseInt(customCycle) || storedCycleDays) : selectedCycle;
+  const effectiveCycle = useCustom ? (parseInt(customCycle) || storedCycleDays) : (selectedCycle ?? storedCycleDays);
 
   // ── Juz/Hizb toggle logic ────────────────────────────────────────────────
   const toggleJuz = (juzId: string) => {
@@ -252,11 +253,15 @@ export default function ConfigPage() {
           </h2>
           <div className="grid grid-cols-5 gap-2 mb-3">
             {CYCLE_PRESETS.map(d => {
-              const active = !useCustom && selectedCycle === d;
+              const active = !useCustom && selectedCycle === d && selectedCycle !== null;
               return (
                 <button
                   key={d}
-                  onClick={() => { setCycleByMode(prev => ({ ...prev, [activeMode]: d })); setUseCustom(false); setCustomCycle(''); }}
+                  onClick={() => {
+                    setCycleByMode(prev => ({ ...prev, [activeMode]: selectedCycle === d ? null : d }));
+                    setUseCustom(false);
+                    setCustomCycle('');
+                  }}
                   className="py-3 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all"
                   style={active
                     ? { background: modeColor, border: `2px solid ${modeColor}` }
@@ -326,18 +331,42 @@ export default function ConfigPage() {
         <section className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-bold text-[#5c5852] uppercase tracking-wide">Sections à suivre</h2>
-            {selectedJuzIds.size > 0 && (
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => {
-                  setSelectedJuzIds(new Set());
-                  setSelectedSurahIds(new Set());
-                  localStorage.removeItem(`qt:surah-selections-${activeMode}`);
+                  if (configView === 'juz') {
+                    const all = new Set<string>();
+                    JUZS.forEach(j => { all.add(j.id); j.childrenIds.forEach((h: string) => all.add(h)); });
+                    setSelectedJuzIds(all);
+                  } else {
+                    const nextSurahIds = new Set(SURAHS.map(s => s.id));
+                    const nextHizbIds = new Set<string>();
+                    HIZBS.forEach(h => {
+                      nextHizbIds.add(h.id);
+                      nextHizbIds.add(`juz-${h.juzNumber}`);
+                    });
+                    setSelectedSurahIds(nextSurahIds);
+                    setSelectedJuzIds(nextHizbIds);
+                  }
                 }}
-                className="text-[12px] text-[#9c9890] flex items-center gap-1"
+                className="text-[12px] font-semibold"
+                style={{ color: modeColor }}
               >
-                <X size={11} /> Tout effacer
+                Tout
               </button>
-            )}
+              {selectedJuzIds.size > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedJuzIds(new Set());
+                    setSelectedSurahIds(new Set());
+                    localStorage.removeItem(`qt:surah-selections-${activeMode}`);
+                  }}
+                  className="text-[12px] text-[#9c9890] flex items-center gap-1"
+                >
+                  <X size={11} /> Effacer
+                </button>
+              )}
+            </div>
           </div>
 
           {/* View toggle */}

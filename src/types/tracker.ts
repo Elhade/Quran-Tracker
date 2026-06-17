@@ -94,16 +94,6 @@ export interface DailyProgress {
   createdAt: string;
 }
 
-export interface UserNote {
-  id: string;
-  userId: string;
-  sectionType: SectionType;
-  sectionId: string;
-  note: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface SectionWithStatus {
   sectionId: string;
   sectionType: SectionType;
@@ -146,13 +136,3 @@ export interface AppStats {
   };
 }
 
-export interface OnboardingData {
-  trackingLevel: TrackingLevel;
-  activeModes: ModeKey[];
-  defaultCycleDays: number;
-  scope: 'full' | 'partial';
-  selectedJuzIds?: string[];
-  quranTextEnabled: boolean;
-  mushafPagesEnabled: boolean;
-  dailyGoal?: number;
-}

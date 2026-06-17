@@ -1,6 +1,8 @@
 export interface DbProfile {
   id: string;
   email: string | null;
+  nom: string | null;
+  prenom: string | null;
   display_name: string;
   avatar_initials: string;
   created_at: string;
@@ -19,17 +21,6 @@ export interface DbTrackerSettings {
   notifications_enabled: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface DbTrackerMode {
-  id: string;
-  user_id: string;
-  key: string;
-  label: string;
-  color: string;
-  is_default: boolean;
-  is_active: boolean;
-  created_at: string;
 }
 
 export interface DbTrackedSection {
@@ -89,12 +80,3 @@ export interface DbDailyProgress {
   updated_at: string;
 }
 
-export interface DbUserNote {
-  id: string;
-  user_id: string;
-  section_type: string;
-  section_id: string;
-  note: string;
-  created_at: string;
-  updated_at: string;
-}

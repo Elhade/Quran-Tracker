@@ -1,15 +1,15 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useModeStore } from '@/store/useModeStore';
-import { useSettingsStore } from '@/store/useSettingsStore';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function TopModeBar() {
   const router = useRouter();
   const { activeMode, setActiveMode } = useModeStore();
-  const { settings } = useSettingsStore();
+  const { user, profile } = useAuthStore();
 
-  const displayName = 'Utilisateur';
-  const initials = 'U';
+  const initials = profile?.avatar_initials || (user?.email ? user.email[0].toUpperCase() : 'U');
+  const displayName = profile?.display_name || (user?.email ?? 'Utilisateur');
 
   return (
     <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-50 h-11 bg-[#161412] border-b border-white/7 flex items-center justify-between px-4">

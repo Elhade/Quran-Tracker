@@ -1,5 +1,5 @@
 export const FEATURES = {
-  AUTH_ENABLED: false,
+  AUTH_ENABLED: true,
   MULTI_PROFILE_ENABLED: false,
   PWA_ENABLED: true,
   PUBLIC_SAAS_READY: true,
