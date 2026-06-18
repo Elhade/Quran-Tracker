@@ -1,5 +1,5 @@
 import type { SectionStatus } from '../../types/tracker';
-import { today, isPastDate, isTodayDate, daysAgo } from '../utils/dates';
+import { isPastDate, isTodayDate, daysAgo } from '../utils/dates';
 
 export function computeSectionStatus(
   lastRevisionDate: string | null,

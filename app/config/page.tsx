@@ -33,12 +33,34 @@ export default function ConfigPage() {
 
   const [customCycle, setCustomCycle] = useState('');
   const [useCustom, setUseCustom] = useState(false);
-  const [selectedJuzIds, setSelectedJuzIds] = useState<Set<string>>(new Set());
+  // juzViewIds: selections made in juz/hizb tab (only toggleJuz/toggleHizb write here)
+  const [juzViewIds, setJuzViewIds] = useState<Set<string>>(new Set());
   const [selectedSurahIds, setSelectedSurahIds] = useState<Set<string>>(new Set());
   const [expandedJuz, setExpandedJuz] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [saved, setSaved] = useState(false);
   const [configView, setConfigView] = useState<ConfigView>('juz');
+
+  // surahDerivedJuzIds: hizbs (and auto-juzs) implied by the current sourate selections
+  const surahDerivedJuzIds = useMemo(() => {
+    const result = new Set<string>();
+    selectedSurahIds.forEach(sid => {
+      const s = SURAHS.find(s => s.id === sid);
+      if (s) getHizbsForSurah(s).forEach(h => result.add(h.id));
+    });
+    // Auto-add the parent juz when all its hizbs are covered by surah selections
+    JUZS.forEach(juz => {
+      if (juz.childrenIds.every((hId: string) => result.has(hId))) result.add(juz.id);
+    });
+    return result;
+  }, [selectedSurahIds]);
+
+  // selectedJuzIds: union of both views — used for display and saving
+  const selectedJuzIds = useMemo(() => {
+    const result = new Set(juzViewIds);
+    surahDerivedJuzIds.forEach(id => result.add(id));
+    return result;
+  }, [juzViewIds, surahDerivedJuzIds]);
 
   useEffect(() => {
     loadData(LOCAL_USER_ID, activeMode);
@@ -50,7 +72,7 @@ export default function ConfigPage() {
   useEffect(() => {
     const modeSections = sections.filter(s => s.modeKey === activeMode && s.isSelected);
     const hizbSet = new Set(modeSections.map(s => s.sectionId));
-    setSelectedJuzIds(hizbSet);
+    setJuzViewIds(hizbSet);
     // Read surah selections from localStorage (explicit, not derived from hizbs)
     try {
       const saved = localStorage.getItem(`qt:surah-selections-${activeMode}`);
@@ -63,10 +85,11 @@ export default function ConfigPage() {
   const effectiveCycle = useCustom ? (parseInt(customCycle) || storedCycleDays) : (selectedCycle ?? storedCycleDays);
 
   // ── Juz/Hizb toggle logic ────────────────────────────────────────────────
+  // Only touches juzViewIds — surah-derived sections are computed separately.
   const toggleJuz = (juzId: string) => {
     const juz = JUZS.find(j => j.id === juzId);
     if (!juz) return;
-    const next = new Set(selectedJuzIds);
+    const next = new Set(juzViewIds);
     if (next.has(juzId)) {
       next.delete(juzId);
       juz.childrenIds.forEach((hId: string) => next.delete(hId));
@@ -74,13 +97,13 @@ export default function ConfigPage() {
       next.add(juzId);
       juz.childrenIds.forEach((hId: string) => next.add(hId));
     }
-    setSelectedJuzIds(next);
+    setJuzViewIds(next);
   };
 
   const toggleHizb = (hizbId: string, juzId: string) => {
     const juz = JUZS.find(j => j.id === juzId);
     if (!juz) return;
-    const next = new Set(selectedJuzIds);
+    const next = new Set(juzViewIds);
     if (next.has(hizbId)) {
       next.delete(hizbId);
       next.delete(juzId);
@@ -89,64 +112,33 @@ export default function ConfigPage() {
       const allHizbsSelected = juz.childrenIds.every((hId: string) => hId === hizbId || next.has(hId));
       if (allHizbsSelected) next.add(juzId);
     }
-    setSelectedJuzIds(next);
+    setJuzViewIds(next);
   };
 
   // ── Sourate toggle logic ─────────────────────────────────────────────────
-  // selectedSurahIds is the source of truth for "selected" in sourate view.
-  // "partial" is still derived from hizb coverage so juz-mode selections are visible.
+  // selectedSurahIds is the source of truth for explicit sourate selections.
+  // Coverage from juz-view: all hizbs covered → 'selected', some → 'partial'.
   const getSurahState = (surahId: string): 'selected' | 'partial' | 'none' => {
     if (selectedSurahIds.has(surahId)) return 'selected';
     const surah = SURAHS.find(s => s.id === surahId);
     if (!surah) return 'none';
     const hizbs = getHizbsForSurah(surah);
     if (hizbs.length === 0) return 'none';
-    // Hizbs that are in selectedJuzIds solely because of other selected surahs don't count as partial
-    const surahDerivedHizbIds = new Set<string>();
-    selectedSurahIds.forEach(sid => {
-      const s = SURAHS.find(s => s.id === sid);
-      if (s) getHizbsForSurah(s).forEach(h => surahDerivedHizbIds.add(h.id));
-    });
-    const hasJuzViewHizb = hizbs.some(h => selectedJuzIds.has(h.id) && !surahDerivedHizbIds.has(h.id));
-    if (hasJuzViewHizb) return 'partial';
+    const coveredCount = hizbs.filter(h => juzViewIds.has(h.id)).length;
+    if (coveredCount === hizbs.length) return 'selected'; // fully covered by juz-view
+    if (coveredCount > 0) return 'partial';               // partially covered
     return 'none';
   };
 
+  // Only touches selectedSurahIds — juzViewIds is never modified by surah toggles.
   const toggleSurah = (surahId: string) => {
-    const surah = SURAHS.find(s => s.id === surahId);
-    if (!surah) return;
-    const hizbs = getHizbsForSurah(surah);
-    const isSelected = selectedSurahIds.has(surahId);
     const nextSurahIds = new Set(selectedSurahIds);
-    const nextHizbIds = new Set(selectedJuzIds);
-
-    if (isSelected) {
+    if (nextSurahIds.has(surahId)) {
       nextSurahIds.delete(surahId);
-      hizbs.forEach(h => {
-        // Only remove hizb if no other explicitly-selected surah still needs it
-        const stillNeeded = SURAHS.some(s =>
-          s.id !== surahId &&
-          nextSurahIds.has(s.id) &&
-          getHizbsForSurah(s).some(sh => sh.id === h.id)
-        );
-        if (!stillNeeded) {
-          nextHizbIds.delete(h.id);
-          nextHizbIds.delete(`juz-${h.juzNumber}`);
-        }
-      });
     } else {
       nextSurahIds.add(surahId);
-      hizbs.forEach(h => {
-        nextHizbIds.add(h.id);
-        const juz = JUZS.find(j => j.number === h.juzNumber);
-        if (juz && juz.childrenIds.every((hId: string) => nextHizbIds.has(hId))) {
-          nextHizbIds.add(juz.id);
-        }
-      });
     }
-
     setSelectedSurahIds(nextSurahIds);
-    setSelectedJuzIds(nextHizbIds);
   };
 
   // ── Summary counts ───────────────────────────────────────────────────────
@@ -337,16 +329,10 @@ export default function ConfigPage() {
                   if (configView === 'juz') {
                     const all = new Set<string>();
                     JUZS.forEach(j => { all.add(j.id); j.childrenIds.forEach((h: string) => all.add(h)); });
-                    setSelectedJuzIds(all);
+                    setJuzViewIds(all);
                   } else {
-                    const nextSurahIds = new Set(SURAHS.map(s => s.id));
-                    const nextHizbIds = new Set<string>();
-                    HIZBS.forEach(h => {
-                      nextHizbIds.add(h.id);
-                      nextHizbIds.add(`juz-${h.juzNumber}`);
-                    });
-                    setSelectedSurahIds(nextSurahIds);
-                    setSelectedJuzIds(nextHizbIds);
+                    setSelectedSurahIds(new Set(SURAHS.map(s => s.id)));
+                    // surahDerivedJuzIds will automatically cover all hizbs/juzs
                   }
                 }}
                 className="text-[12px] font-semibold"
@@ -357,7 +343,7 @@ export default function ConfigPage() {
               {selectedJuzIds.size > 0 && (
                 <button
                   onClick={() => {
-                    setSelectedJuzIds(new Set());
+                    setJuzViewIds(new Set());
                     setSelectedSurahIds(new Set());
                     localStorage.removeItem(`qt:surah-selections-${activeMode}`);
                   }}
@@ -411,6 +397,7 @@ export default function ConfigPage() {
                 const juzSelected = selectedJuzIds.has(juz.id);
                 const hizbsInJuz = HIZBS.filter(h => h.juzNumber === juz.number);
                 const anyHizbSelected = hizbsInJuz.some(h => selectedJuzIds.has(h.id));
+                const isJuzPartial = anyHizbSelected && !juzSelected;
                 const isOpen = expandedJuz === juz.id;
                 const selectedCount = hizbsInJuz.filter(h => selectedJuzIds.has(h.id)).length;
 
@@ -425,7 +412,8 @@ export default function ConfigPage() {
                           : { background: '#fff', borderColor: '#e2ddd6' }
                         }
                       >
-                        {(juzSelected || anyHizbSelected) && <Check size={12} className="text-white" />}
+                        {juzSelected && <Check size={12} className="text-white" />}
+                        {isJuzPartial && <div className="w-2 h-2 rounded-sm bg-white" />}
                       </button>
                       <div
                         className="flex-1 cursor-pointer flex items-center gap-2"

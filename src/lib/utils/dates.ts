@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow, differenceInDays, parseISO, isToday, isBefore, isAfter, addDays } from 'date-fns';
+import { format, differenceInDays, parseISO, isToday, isBefore, isAfter, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export function today(): string {
@@ -22,7 +22,10 @@ export function daysUntil(date: string): number {
 }
 
 export function addDaysToDate(date: string, days: number): string {
-  return addDays(parseISO(date), days).toISOString().split('T')[0];
+  // Parse as UTC midnight to avoid local-timezone drift when converting back to ISO string
+  const [y, m, d] = date.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d + days));
+  return utc.toISOString().split('T')[0];
 }
 
 export function isTodayDate(date: string): boolean {
