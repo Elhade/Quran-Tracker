@@ -1,8 +1,18 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
+import AuthProvider from '@/components/layout/AuthProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const amiri = localFont({
+  src: [
+    { path: '../public/fonts/scheherazade-new-arabic-400.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/scheherazade-new-arabic-700.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-amiri',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Quran Tracker',
@@ -24,7 +34,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body className={`${inter.variable} font-sans bg-[#f5f3ef]`}>{children}</body>
+      <body className={`${inter.variable} ${amiri.variable} font-sans bg-[#f5f3ef]`}>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

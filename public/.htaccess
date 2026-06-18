@@ -1,0 +1,10 @@
+Options -MultiViews
+RewriteEngine On
+
+# Serve existing files/directories as-is
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# For static export: redirect unknown paths to index.html (client-side routing fallback)
+RewriteRule ^ index.html [L]
