@@ -41,9 +41,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (event === 'SIGNED_IN' && user) {
         set({ syncing: true });
         try {
-          await pushLocalToSupabase(user.id);
           const profile = await getProfile(user.id);
-          set({ profile, lastSynced: new Date() });
+          set({ profile });
+          if (profile) {
+            await pushLocalToSupabase(user.id);
+            set({ lastSynced: new Date() });
+          }
         } catch (e) {
           console.error('[sync] push local failed:', e);
         } finally {
@@ -53,9 +56,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (event === 'INITIAL_SESSION' && user) {
         try {
-          await pushLocalSections(user.id);
           const profile = await getProfile(user.id);
-          set({ profile, lastSynced: new Date() });
+          set({ profile });
+          if (profile) {
+            await pushLocalSections(user.id);
+            set({ lastSynced: new Date() });
+          }
         } catch (e) {
           console.error('[sync] initial session sync failed:', e);
         }
@@ -68,8 +74,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Real-time sync: watch tracker store for new revisions and section changes
     const unsubTracker = useTrackerStore.subscribe(async (state, prevState) => {
-      const currentUser = get().user;
-      if (!currentUser) return;
+      const { user: currentUser, profile: currentProfile } = get();
+      if (!currentUser || !currentProfile) return;
 
       // Sync new revisions + today's daily_progress
       if (state.revisions !== prevState.revisions && state.revisions.length > prevState.revisions.length) {

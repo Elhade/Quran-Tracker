@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { ChevronDown, Check, RotateCcw } from 'lucide-react';
-import { daysUntil } from '@/lib/utils/dates';
 import type { Juz } from '@/types/quran';
 import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
 import StatusBadge from './StatusBadge';
@@ -9,6 +8,7 @@ import HizbCard from './HizbCard';
 import { getHizbsForJuz } from '@/data/quran/quran-structure';
 
 const DONE_COLOR = '#2d7a4f';
+const TODAY_COLOR = '#eab308';
 
 interface JuzCardProps {
   juz: Juz;
@@ -37,14 +37,24 @@ export default function JuzCard({
   const isDone    = sectionStatus?.status === 'done';
 
   const trackedHizbs  = hizbs.filter(h => hizbStatuses.has(h.id));
-  const doneHizbs     = trackedHizbs.filter(h => hizbStatuses.get(h.id)?.status === 'done').length;
+  // done (révisé aujourd'hui) + upcoming (révisé avant, prochaine révision dans le futur) = "bon état ce cycle"
+  const doneHizbs     = trackedHizbs.filter(h => {
+    const s = hizbStatuses.get(h.id)?.status;
+    return s === 'done' || s === 'upcoming';
+  }).length;
   const progress      = trackedHizbs.length > 0 ? doneHizbs / trackedHizbs.length : 0;
   const allHizbsDone  = trackedHizbs.length > 0 && doneHizbs === trackedHizbs.length;
 
-  const daysToNext = sectionStatus?.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
-  const borderColor = isDone ? DONE_COLOR
-    : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
-    : daysToNext === 0 ? '#f97316'
+  // Border reflects the worst status among the juz itself and all its tracked hizbs
+  const STATUS_PRIORITY: Record<string, number> = { overdue: 4, today: 3, new: 2, upcoming: 1, done: 0 };
+  const effectiveStatus = trackedHizbs.reduce((worst, h) => {
+    const hs = hizbStatuses.get(h.id);
+    return hs && (STATUS_PRIORITY[hs.status] ?? 0) > (STATUS_PRIORITY[worst] ?? 0) ? hs.status : worst;
+  }, sectionStatus?.status ?? 'new');
+  const isRevised   = effectiveStatus === 'done' || effectiveStatus === 'upcoming';
+  const borderColor = isRevised        ? DONE_COLOR
+    : effectiveStatus === 'overdue'    ? '#c92b2b'
+    : effectiveStatus === 'today'      ? TODAY_COLOR
     : '#e2ddd6';
 
   return (

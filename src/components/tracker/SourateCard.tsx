@@ -23,6 +23,8 @@ interface SourateCardProps {
 }
 
 
+const TODAY_COLOR = '#eab308';
+
 const DIFF: { key: DifficultyLevel; label: string; color: string }[] = [
   { key: 'facile',    label: 'F', color: '#1a7a3c' },
   { key: 'moyen',     label: 'M', color: '#b8841a' },
@@ -37,10 +39,11 @@ export default function SourateCard({
   const [expanded, setExpanded] = useState(false);
 
   const isDone     = sectionStatus.status === 'done';
+  const isRevised  = isDone || sectionStatus.status === 'upcoming';
   const daysToNext = sectionStatus.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
-  const borderColor = isDone ? DONE_COLOR
+  const borderColor = isRevised ? DONE_COLOR
     : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
-    : daysToNext === 0 ? '#f97316'
+    : daysToNext === 0 ? TODAY_COLOR
     : '#e2ddd6';
   const difficulty  = sectionStatus.difficulty;
 

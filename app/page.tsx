@@ -152,10 +152,13 @@ export default function GroupTrackerPage() {
     headerTargetPerDay = cycleDays > 0 ? Math.round(headerCycleTotal / cycleDays) : 0;
     headerUnit         = 'pages';
   } else if (viewType === 'juz') {
-    headerCycleTotal   = allJuzs.length;
-    headerCycleDone    = allJuzs.filter(isDoneThisCycle).length;
-    headerTodayDone    = allJuzs.filter(isTodayRevised).length;
-    headerTargetPerDay = cycleDays > 0 ? allJuzs.length / cycleDays : 0;
+    // 1 juz = 2 hizbs — derive juz-equivalent counts from hizb progress so
+    // validating individual hizbs updates the header even before the full juz is done
+    const juzTotal     = allJuzs.length > 0 ? allJuzs.length : allHizbs.length / 2;
+    headerCycleTotal   = juzTotal;
+    headerCycleDone    = allHizbs.filter(isDoneThisCycle).length / 2;
+    headerTodayDone    = allHizbs.filter(isTodayRevised).length / 2;
+    headerTargetPerDay = cycleDays > 0 ? juzTotal / cycleDays : 0;
     headerUnit         = 'juz';
   } else {
     headerCycleTotal   = allHizbs.length;
@@ -217,8 +220,20 @@ export default function GroupTrackerPage() {
     if (statusFilter === 'all') {
       return statusMap.has(juz.id) || juz.childrenIds.some((hId: string) => statusMap.has(hId));
     }
-    return filteredJuzSectionIds.has(juz.id) ||
-      juz.childrenIds.some((hId: string) => { const h = hizbStatusMap.get(hId); return h ? sectionMatches(h) : false; });
+
+    const trackedHizbsForJuz = juz.childrenIds
+      .map((hId: string) => hizbStatusMap.get(hId))
+      .filter((h): h is SectionWithStatus => h !== undefined);
+
+    if (trackedHizbsForJuz.length > 0) {
+      // "Révisé/Lu" : un juz n'est révisé que si TOUS ses hizbs le sont
+      if (statusFilter === 'fait') return trackedHizbsForJuz.every(h => sectionMatches(h));
+      // Autres filtres (non_fait, difficultés) : au moins un hizb correspond
+      return trackedHizbsForJuz.some(h => sectionMatches(h));
+    }
+
+    // Aucun hizb tracké : se baser sur le statut propre du juz
+    return filteredJuzSectionIds.has(juz.id);
   });
 
   // For hizb view: match filteredSections to HIZBS static data

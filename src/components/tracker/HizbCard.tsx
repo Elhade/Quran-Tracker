@@ -8,7 +8,8 @@ import type { SectionWithStatus, DifficultyLevel } from '@/types/tracker';
 import RubRow from './RubRow';
 import { getRubsForHizb } from '@/data/quran/quran-structure';
 
-const DONE_COLOR = '#2d7a4f';
+const DONE_COLOR  = '#2d7a4f';
+const TODAY_COLOR = '#eab308';
 
 interface HizbCardProps {
   hizb: Hizb;
@@ -33,10 +34,11 @@ export default function HizbCard({
   const [expanded, setExpanded] = useState(false);
 
   const isDone     = sectionStatus.status === 'done';
+  const isRevised  = isDone || sectionStatus.status === 'upcoming';
   const daysToNext = sectionStatus.nextRevisionDate ? daysUntil(sectionStatus.nextRevisionDate) : null;
-  const borderColor = isDone ? DONE_COLOR
+  const borderColor = isRevised ? DONE_COLOR
     : daysToNext !== null && daysToNext < 0 ? '#c92b2b'
-    : daysToNext === 0 ? '#f97316'
+    : daysToNext === 0 ? TODAY_COLOR
     : '#e2ddd6';
 
   const rubs       = getRubsForHizb(hizb.number);

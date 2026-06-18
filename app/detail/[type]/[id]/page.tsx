@@ -279,8 +279,8 @@ export default function DetailPage({ params }: PageProps) {
     setNote(LOCAL_USER_ID, type, id, note);
     setNoteSaved(true);
     setTimeout(() => setNoteSaved(false), 2000);
-    const { user } = useAuthStore.getState();
-    if (user) upsertNote(user.id, type, id, note).catch(() => {});
+    const { user, profile } = useAuthStore.getState();
+    if (user && profile) upsertNote(user.id, type, id, note).catch(() => {});
   };
 
   const dernAgo = sectionStatus?.lastRevisionDate ? daysAgo(sectionStatus.lastRevisionDate) : null;
@@ -307,7 +307,9 @@ export default function DetailPage({ params }: PageProps) {
   })();
 
   const prochLabel = prochDays === null ? 'Non planifiée'
-    : prochDays <= 0 ? "Aujourd'hui"
+    : prochDays === 0 ? "Aujourd'hui"
+    : prochDays === -1 ? 'Hier'
+    : prochDays < 0 ? `il y a ${Math.abs(prochDays)} jours`
     : prochDays === 1 ? 'Demain'
     : `dans ${prochDays} jour${prochDays > 1 ? 's' : ''}`;
 

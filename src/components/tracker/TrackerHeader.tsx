@@ -124,7 +124,7 @@ export default function TrackerHeader({
               </div>
               {catchUp > 0 && (
                 <span className="text-[10px] font-semibold mt-1" style={{ color: '#fde68a' }}>
-                  retard : {fmt(targetPerDay + catchUp)} {unit} (+{fmt(catchUp)} à rattraper)
+                  {fmt(targetPerDay)} d'aujourd'hui + {fmt(catchUp)} à rattraper
                 </span>
               )}
             </div>
