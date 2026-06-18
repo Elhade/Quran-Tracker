@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./out/
-          server-dir: /
+          server-dir: /moussy13/
           # Ne re-upload que les fichiers modifiés (diff par hash)
           state-name: .ftp-deploy-sync-state.json
           exclude: |
