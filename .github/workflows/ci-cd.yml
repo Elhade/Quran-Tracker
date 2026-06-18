@@ -57,6 +57,47 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
+      - name: Cleanup old /moussy13 folder on server
+        run: |
+          python3 - <<'EOF'
+          import ftplib
+          def rmdir(ftp, path):
+              try:
+                  ftp.cwd(path)
+              except:
+                  return
+              items = []
+              ftp.retrlines('LIST', items.append)
+              for item in items:
+                  parts = item.split()
+                  name = parts[-1]
+                  if name in ('.', '..'):
+                      continue
+                  full = f"{path}/{name}"
+                  if item.startswith('d'):
+                      rmdir(ftp, full)
+                  else:
+                      try: ftp.delete(full)
+                      except: pass
+              try:
+                  ftp.cwd('/')
+                  ftp.rmd(path)
+              except: pass
+
+          import os
+          ftp = ftplib.FTP_TLS()
+          ftp.connect('qurantracker.ghost-service.fr', 21, timeout=30)
+          ftp.login(os.environ['FTP_USERNAME'], os.environ['FTP_PASSWORD'])
+          ftp.prot_p()
+          ftp.set_pasv(True)
+          rmdir(ftp, '/moussy13')
+          print('Cleanup done')
+          ftp.quit()
+          EOF
+        env:
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -67,7 +108,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./out/
-          server-dir: /moussy13/
+          server-dir: /
           # Ne re-upload que les fichiers modifiés (diff par hash)
           state-name: .ftp-deploy-sync-state.json
           exclude: |
